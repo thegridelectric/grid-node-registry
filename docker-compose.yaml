@@ -1,0 +1,23 @@
+# NOTE:THIS DID NOT WORK WITH MAKING A FIRST ALEMBIC VERSION
+services:
+  postgres:
+    image: postgres:16
+    container_name: gnr-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gnr
+      POSTGRES_PASSWORD: gnrpass
+      POSTGRES_DB: gnr
+    ports:
+      - "5432:5432"
+    volumes:
+      - gnr_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "gnr"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  gnr_pgdata:
+    name: gnr_pgdata
