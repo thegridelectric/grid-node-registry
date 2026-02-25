@@ -1,12 +1,12 @@
 from enum import auto
 from typing import List
 
-from gnr.asl.enums.gw_str_enum import GwStrEnum
+from gnr.sema.enums.gw_str_enum import GwStrEnum
 
 
 class BaseGNodeClass(GwStrEnum):
     """
-    ASL enum schema:
+    Sema:
     [https://schemas.electricity.works/enums/base.g.node.class/000](https://schemas.electricity.works/enums/base.g.node.class/000)
     """
     TerminalAsset = auto()

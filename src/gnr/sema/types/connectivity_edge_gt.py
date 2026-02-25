@@ -3,16 +3,14 @@ from typing_extensions import Self
 
 from pydantic import model_validator
 
-from gnr.asl.base import AslType
-from gnr.asl.enums import GNodeStatus
-from gnr.asl.property_format import UUID4Str, LeftRightDot
+from gnr.sema.base import SemaType
+from gnr.sema.enums import GNodeStatus
+from gnr.sema.property_format import UUID4Str, LeftRightDot
 
 
-class ConnectivityEdgeGt(AslType):
-    """
-    ASL schema:
-    https://schemas.electricity.works/types/connectivity.edge.gt/000
-    """
+class ConnectivityEdgeGt(SemaType):
+    """Sema: https://schemas.electricity.works/types/connectivity.edge.gt/000"""
+
     id: UUID4Str
     from_g_node_id: UUID4Str
     to_g_node_id: UUID4Str

@@ -1,8 +1,8 @@
 """
 SQLAlchemy models for the GridNodeRegistry.
 
-Each SQL row corresponds to a serialized ASL GT snapshot.
-ASL types are used for validation (via the codec) before any insert/update.
+Each SQL row corresponds to a serialized Sema GT snapshot.
+Sema types are used for validation (via the codec) before any insert/update.
 """
 
 from __future__ import annotations
@@ -24,8 +24,8 @@ from sqlalchemy.orm import (
     declarative_base,
 )
 
-from gnr.asl.enums import GNodeStatus, BaseGNodeClass
-from gnr.asl.types import (
+from gnr.sema.enums import GNodeStatus, BaseGNodeClass
+from gnr.sema.types import (
     GNodeGt,
     ConnectivityEdgeGt,
     PositionPointGt,
@@ -50,7 +50,7 @@ class PositionPointSql(Base):
     )
 
     def to_gt(self) -> PositionPointGt:
-        """Serialize database row → ASL GT."""
+        """Serialize database row → Sema GT."""
         return PositionPointGt(
             id=self.id,
             latitude_micro_deg=self.latitude_micro_deg,
@@ -59,7 +59,7 @@ class PositionPointSql(Base):
 
     @staticmethod
     def from_gt(gt: PositionPointGt) -> "PositionPointSql":
-        """Create SQL row from ASL GT after full ASL validation."""
+        """Create SQL row from Sema GT after full Sema validation."""
         return PositionPointSql(
             id=gt.id,
             latitude_micro_deg=gt.latitude_micro_deg,
@@ -100,11 +100,11 @@ class GNodeSql(Base):
     )
 
     # -------------------
-    #  ASL ↔ SQL Helpers
+    #  Sema ↔ SQL Helpers
     # -------------------
 
     def to_gt(self) -> GNodeGt:
-        """Serialize SQL row → ASL GT."""
+        """Serialize SQL row → Sema GT."""
         return GNodeGt(
             g_node_id=self.id,
             alias=self.alias,
@@ -118,7 +118,7 @@ class GNodeSql(Base):
 
     @staticmethod
     def from_gt(gt: GNodeGt) -> "GNodeSql":
-        """Create SQL model from an ASL GT instance (already validated)."""
+        """Create SQL model from an Sema GT instance (already validated)."""
         return GNodeSql(
             id=gt.g_node_id,
             alias=gt.alias,
@@ -166,7 +166,7 @@ class ConnectivityEdgeSql(Base):
     )
 
     # -------------------
-    #  ASL ↔ SQL Helpers
+    #  Sema ↔ SQL Helpers
     # -------------------
 
     def to_gt(self) -> ConnectivityEdgeGt:

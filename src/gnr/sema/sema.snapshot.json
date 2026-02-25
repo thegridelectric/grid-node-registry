@@ -1,0 +1,653 @@
+{
+  "snapshot_version": "1.0",
+  "generated_at": "2026-02-24T16:35:00Z",
+  "registry_subset": {
+    "formats": {
+      "handle.name": {
+        "owner": "gridworks-energy",
+        "schema_url": "https://schemas.electricity.works/formats/handle.name",
+        "created": "2026-02-22T16:43:00Z",
+        "description": "Dot-separated hierarchical identifier with hyphen-friendly lowercase segments"
+      },
+      "left.right.dot": {
+        "owner": "gridworks-energy",
+        "schema_url": "https://schemas.electricity.works/formats/left.right.dot",
+        "created": "2026-02-22T16:43:00Z",
+        "description": "Dot-separated hierarchical identifier composed of lowercase alphanumeric segments"
+      },
+      "spaceheat.name": {
+        "owner": "gridworks-energy",
+        "schema_url": "https://schemas.electricity.works/formats/spaceheat.name",
+        "created": "2026-02-22T16:43:00Z",
+        "description": "Single-segment lowercase identifier with optional internal hyphen-separated words"
+      },
+      "utc.milliseconds": {
+        "owner": "gridworks-energy",
+        "schema_url": "https://schemas.electricity.works/formats/utc.milliseconds",
+        "created": "2026-02-22T16:43:00Z",
+        "description": "UTC timestamp in whole milliseconds since Unix epoch (2000–3000 range)"
+      },
+      "utc.seconds": {
+        "owner": "gridworks-energy",
+        "schema_url": "https://schemas.electricity.works/formats/utc.seconds",
+        "created": "2026-02-22T16:43:00Z",
+        "description": "UTC timestamp in whole seconds since Unix epoch (2000–3000 range)"
+      },
+      "uuid4.str": {
+        "owner": "gridworks-energy",
+        "created": "2026-02-22T16:43:00Z",
+        "description": "Canonical lowercase UUIDv4 string (RFC 4122) in 8-4-4-4-12 format"
+      }
+    },
+    "enums": {
+      "base.g.node.class": {
+        "latest_version": "000",
+        "owner": "gridworks-energy",
+        "description": "Universal physical ontology classification for Grid Nodes",
+        "versions": {
+          "000": {
+            "schema_url": "https://schemas.electricity.works/enums/base.g.node.class/000",
+            "created": "2026-02-22T16:43:00Z"
+          }
+        }
+      },
+      "g.node.status": {
+        "latest_version": "000",
+        "owner": "gridworks-energy",
+        "description": "Lifecycle status of a Grid Node within the registry",
+        "versions": {
+          "000": {
+            "schema_url": "https://schemas.electricity.works/enums/g.node.status/000",
+            "created": "2026-02-22T16:43:00Z"
+          }
+        }
+      },
+      "gw.g.node.class": {
+        "latest_version": "000",
+        "owner": "gridworks-energy",
+        "description": "GridWorks-specific functional classification for GNodes",
+        "versions": {
+          "000": {
+            "schema_url": "https://schemas.electricity.works/enums/gw.g.node.class/000",
+            "created": "2026-02-23T17:08:00Z"
+          }
+        }
+      }
+    },
+    "types": {
+      "connectivity.edge.gt": {
+        "latest_version": "000",
+        "owner": "gridworks-energy",
+        "versioning_strategy": "literal",
+        "description": "Directed topological edge connecting two Grid Nodes in the physical electric network",
+        "versions": {
+          "000": {
+            "schema_url": "https://schemas.electricity.works/types/connectivity.edge.gt/000",
+            "created": "2026-02-23T14:00:00Z",
+            "summary": "Initial definition of structural copper adjacency between two GNodes",
+            "dependencies": {
+              "direct": [
+                "uuid4.str",
+                "left.right.dot",
+                "g.node.status:000"
+              ],
+              "all": [
+                "uuid4.str",
+                "left.right.dot",
+                "g.node.status:000"
+              ]
+            }
+          }
+        }
+      },
+      "g.node.gt": {
+        "latest_version": "004",
+        "owner": "gridworks-energy",
+        "versioning_strategy": "literal",
+        "description": "Fundamental identity object representing physical and logical grid nodes",
+        "versions": {
+          "004": {
+            "schema_url": "https://schemas.electricity.works/types/g.node.gt/004",
+            "created": "2026-02-23T14:00:00Z",
+            "summary": "Clarified architectural description, strengthened axioms, and formalized composability model",
+            "dependencies": {
+              "direct": [
+                "base.g.node.class:000",
+                "g.node.status:000",
+                "left.right.dot",
+                "uuid4.str"
+              ],
+              "all": [
+                "base.g.node.class:000",
+                "g.node.status:000",
+                "left.right.dot",
+                "uuid4.str"
+              ]
+            }
+          }
+        }
+      },
+      "position.point.gt": {
+        "latest_version": "000",
+        "owner": "gridworks-energy",
+        "versioning_strategy": "literal",
+        "description": "Geographic position expressed in integer microdegrees (WGS84)",
+        "versions": {
+          "000": {
+            "schema_url": "https://schemas.electricity.works/types/position.point.gt/000",
+            "created": "2026-02-24T15:00:00Z",
+            "summary": "Initial version.",
+            "dependencies": {
+              "direct": [
+                "uuid4.str"
+              ],
+              "all": [
+                "uuid4.str"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "formats": {
+      "handle.name": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://schemas.electricity.works/formats/handle.name",
+        "title": "handle.name",
+        "description": "Dot-separated hierarchical identifier composed of lowercase segments. Each segment must begin with a lowercase alphabetic character and may contain lowercase alphanumeric characters with optional internal hyphen-separated words. Hierarchy is expressed from left to right, with the most significant component appearing first.",
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:-[a-z0-9]+)*)*$",
+        "examples": [
+        "main-tank",
+        "sensor-1",
+        "hp-odu.pump-relay"
+        ],
+        "counterexamples": [
+        "",
+        "1st-floor",
+        "Main-Tank",
+        "sensor_1",
+        "sensor 1",
+        "tank.",
+        ".tank",
+        "a..b",
+        "a.-b",
+        "a.b-",
+        "a--b",
+        "a.b--c",
+        "a.1b",
+        "a.b.c3-",
+        "a.b.c#"
+        ],
+        "x-gridworks": {
+        "owner": "gridworks-energy"
+        }
+      },
+
+      "left.right.dot": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://schemas.electricity.works/formats/left.right.dot",
+        "title": "left.right.dot",
+        "description": "Dot-separated hierarchical identifier composed of lowercase alphanumeric segments. The first segment must begin with a lowercase alphabetic character. Subsequent segments may begin with either a lowercase letter or digit. Hierarchy is expressed from left to right, with the most significant component appearing first.",
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[a-z][a-z0-9]*(\\.[a-z0-9]+)*$",
+        "examples": [
+        "beech.1",
+        "hw1.isone.me.versant.keene.beech"
+        ],
+        "counterexamples": [
+        "scada.multipurpose-sensor",
+        "2be.or.not",
+        "a..b",
+        ""
+        ],
+        "x-gridworks": {
+        "owner": "gridworks-energy"
+        }
+      },
+
+      "spaceheat.name": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://schemas.electricity.works/formats/spaceheat.name",
+        "title": "spaceheat.name",
+        "description": "Single-segment identifier composed of lowercase alphanumeric characters with optional internal hyphen-separated words. Must begin with a lowercase alphabetic character.",
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+        "minLength": 1,
+        "maxLength": 64,
+        "examples": [
+        "scada",
+        "tank1-depth2"
+        ],
+        "counterexamples": [
+        "Tank1",
+        "1st-tank",
+        "tank_depth",
+        "tank.",
+        "tank--depth",
+        "-tank",
+        "tank-"
+        ],
+        "x-gridworks": {
+        "owner": "gridworks-energy"
+        }
+      },
+
+      "utc.milliseconds": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://schemas.electricity.works/formats/utc.milliseconds",
+        "title": "utc.milliseconds",
+        "description": "UTC timestamp expressed as whole milliseconds since the Unix epoch (1970-01-01T00:00:00Z). Value is restricted to the range 2000-01-01T00:00:00Z through 3000-01-01T00:00:00Z.",
+        "type": "integer",
+        "minimum": 946684800000,
+        "maximum": 32503680000000,
+        "examples": [
+        1609459200000,
+        1609459200500,
+        1735689600123
+        ],
+        "counterexamples": [
+        0,
+        946684799999,
+        32503680000001,
+        1609459200000.5
+        ],
+        "x-gridworks": {
+        "owner": "gridworks-energy"
+        }
+      },
+
+      "utc.seconds": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://schemas.electricity.works/formats/utc.seconds",
+        "title": "utc.seconds",
+        "description": "UTC timestamp expressed as whole seconds since the Unix epoch (1970-01-01T00:00:00Z). Value is restricted to the range 2000-01-01T00:00:00Z through 3000-01-01T00:00:00Z.",
+        "type": "integer",
+        "minimum": 946684800,
+        "maximum": 32503680000,
+        "examples": [
+        1609459200,
+        1735689600
+        ],
+        "counterexamples": [
+        0,
+        946684799,
+        32503680001,
+        1609459200.5
+        ],
+        "x-gridworks": {
+        "owner": "gridworks-energy"
+        }
+      },
+
+      "uuid4.str": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://schemas.electricity.works/formats/uuid4.str",
+        "title": "uuid4.str",
+        "description": "Canonical lowercase UUID version 4 string in standard hyphenated 8-4-4-4-12 format. Enforces version (4) and variant (RFC 4122) and requires lowercase for consistency.",
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        "minLength": 36,
+        "maxLength": 36,
+        "examples": [
+        "9cff2689-eadc-4577-94ea-6d86d0d23e9e",
+        "4e5a6b1c-2d3e-4f5a-8b9c-1d2e3f4a5b6c",
+        "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+        ],
+        "counterexamples": [
+        "not-a-uuid",
+        "6ba7b810-9dad-11d1-80b4-00c04fd430c",
+        "6ba7b810-9dad-11d1-80b4-00c04fd430c88",
+        "6ba7b810-9dad-21d1-80b4-00c04fd430c8",
+        "6ba7b810-9dad-11d1-70b4-00c04fd430c8",
+        "6BA7B810-9DAD-11D1-80B4-00C04FD430C8"
+        ],
+        "x-gridworks": {
+        "owner": "gridworks-energy"
+        }
+      }
+    },
+    "enums": {
+      "base.g.node.class": {
+        "000": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://schemas.electricity.works/enums/base.g.node.class/000",
+          "title": "base.g.node.class",
+          "type": "string",
+          "description": "Ontology classification for Grid Nodes (GNodes) used to describe their structural relationship to the physical electric grid. Values identify whether a node represents a physical metered boundary, a physical topological structure, a market coordination constraint, or a purely logical entity.\n\nEvery GNode SHALL declare exactly one base.g.node.class value.",
+          "enum": [
+            "TerminalAsset",
+            "LeafTransactiveNode",
+            "ConnectivityNode",
+            "MarketMaker",
+            "Logical"
+          ],
+          "default": "Logical",
+          "x-gridworks": {
+            "owner": "gridworks-energy",
+            "version": "000",
+            "value_descriptions": {
+              "TerminalAsset": "A physical transactive asset such as a heat pump, hot water heater, residential battery, electric vehicle, or any other end-use device located behind an atomic metered point.",
+              "LeafTransactiveNode": "The atomic metered unit of the grid. Represents the smallest indivisible metering boundary capable of participating in markets or entering Dispatch Contracts on behalf of a TerminalAsset. Every TerminalAsset is associated with exactly one LeafTransactiveNode.",
+              "ConnectivityNode": "A physical topological node in the electric power system where conductors join, split, or change configuration. Conceptually aligned with the ConnectivityNode in the IEC 61970/61968 CIM (Common Information Model), but simplified for distribution-level modeling and OPF applications.",
+              "MarketMaker": "A physical constraint point in the conductor topology that requires localized market coordination. Identified as a grid location (e.g., feeder constraint, transformer limit) where a MarketMaker actor computes local prices for balancing and constraint compliance. See [market-maker](https://gridworks.readthedocs.io/en/latest/market-maker.html).",
+              "Logical": "A non-physical Grid Node whose identity carries no inherent conductor-topology or metering semantics. Used for purely logical or service-level nodes such as SCADA, forecasting services, market-maker actors, simulation nodes, or organizational microservices. Logical nodes may coordinate with or operate on physical nodes, but do not themselves represent physical grid structure."
+            }
+          }
+        }
+      },
+      "g.node.status": {
+        "000": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://schemas.electricity.works/enums/g.node.status/000",
+          "title": "g.node.status",
+          "type": "string",
+          "description": "Lifecycle status of a Grid Node (GNode) within coordinated systems.",
+          "enum": [
+            "Pending",
+            "Active",
+            "Suspended",
+            "PermanentlyDeactivated"
+          ],
+          "default": "Pending",
+          "x-gridworks": {
+            "owner": "gridworks-energy",
+            "version": "000",
+            "value_descriptions": {
+              "Pending": "The GNode has been created but is not yet authorized to participate in system coordination.",
+              "Active": "The GNode is authorized to participate in system coordination.",
+              "Suspended": "The GNode is temporarily disabled. It retains identity but does not participate in active coordination. A Suspended GNode MAY transition back to Active.",
+              "PermanentlyDeactivated": "The GNode has been permanently retired and does not participate in active coordination. It may not change back to another state."
+            }
+          }
+        }
+      },
+      "gw.g.node.class": {
+        "000": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://schemas.electricity.works/enums/gw.g.node.class/000",
+          "title": "gw.g.node.class",
+          "type": "string",
+          "description": "GridWorks functional classification for Grid Nodes (GNodes). Defines the operational or service-level role a GNode performs within the GridWorks ecosystem.\n\nThis enum is specific to GridWorks. Other organizations MAY define their own functional taxonomies under separate namespaces (e.g., acme.g.node.class). Structural interoperability across organizations is governed by base.g.node.class, not by this enum.",
+          "enum": [
+            "Unknown",
+            "TerminalAsset",
+            "ConnectivityNode",
+            "LeafTransactiveNode",
+            "MarketMaker",
+            "Scada",
+            "PriceForecastService",
+            "WeatherForecastService",
+            "TimeCoordinator"
+          ],
+          "default": "Unknown",
+          "x-gridworks": {
+            "owner": "gridworks-energy",
+            "version": "000",
+            "value_descriptions": {
+              "Unknown": "A GNode whose class has not yet been assigned.",
+              "TerminalAsset": "A physical transactive asset such as a heat pump, hot water heater, residential battery, electric vehicle, or any other end-use device located behind an atomic metered point.",
+              "ConnectivityNode": "A physical topological node in the electric power system where conductors join, split, or change configuration. Conceptually aligned with the ConnectivityNode in the IEC 61970/61968 CIM (Common Information Model), but simplified for distribution-level modeling and OPF applications.",
+              "LeafTransactiveNode": "The atomic metered unit of the grid. Represents the smallest indivisible metering boundary capable of participating in markets or entering Dispatch Contracts on behalf of a TerminalAsset. Every TerminalAsset is associated with exactly one LeafTransactiveNode.",
+              "MarketMaker": "A physical constraint point in the conductor topology that requires localized market coordination. Identified as a grid location (e.g., feeder constraint, transformer limit) where a MarketMaker actor computes local prices for balancing and constraint compliance. See [market-maker](https://gridworks.readthedocs.io/en/latest/market-maker.html).",
+              "Scada": "A GNode responsible for local telemetry, data acquisition, and control of a TerminalAsset.",
+              "PriceForecastService": "A service that provides forward price projections for planning, bidding, or dispatch optimization.",
+              "WeatherForecastService": "A service that provides meteorological forecasts used for load and generation prediction.",
+              "TimeCoordinator": "A service responsible for maintaining simulation time or orchestrated test time across actors."
+            }
+          }
+        }
+      }
+    },
+    "types": {
+      "connectivity.edge.gt": {
+        "000": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://schemas.electricity.works/types/connectivity.edge.gt/000",
+            "title": "connectivity.edge.gt",
+            "type": "object",
+            "description": "Directed topological edge connecting two Grid Nodes (GNodes) in the physical electric network. This type encodes copper-level adjacency used for graph-based modeling, Kirchhoff power flow calculations, and constraint propagation.\n\nA ConnectivityEdge represents an oriented structural relationship between two distinct GNodes. Direction SHALL be interpreted as the positive reference direction for flow modeling and graph traversal. Physical power MAY flow in either direction subject to system conditions.\n\nFor a given pair of GNodes, only one structural ConnectivityEdge SHALL exist. Reverse flow SHALL be represented through sign conventions in power quantities rather than by duplicating edges in the opposite direction.\n\nConnectivityEdge does not encode electrical impedance, capacity, or switching state. It defines structural topology only.",
+            "properties": {
+                "Id": {
+                "$ref": "https://schemas.electricity.works/formats/uuid4.str",
+                "description": "Globally unique identifier for this ConnectivityEdge."
+                },
+                "FromGNodeId": {
+                "$ref": "https://schemas.electricity.works/formats/uuid4.str",
+                "description": "Unique identifier of the upstream GNode in the directed relationship. This node is the source of the positive reference direction."
+                },
+                "ToGNodeId": {
+                "$ref": "https://schemas.electricity.works/formats/uuid4.str",
+                "description": "Unique identifier of the downstream GNode in the directed relationship. This node is the target of the positive reference direction."
+                },
+                "FromGNodeAlias": {
+                "$ref": "https://schemas.electricity.works/formats/left.right.dot",
+                "description": "Canonical alias of the upstream GNode. Provided for readability, registry lookup, and human interpretability. MUST correspond to FromGNodeId."
+                },
+                "ToGNodeAlias": {
+                "$ref": "https://schemas.electricity.works/formats/left.right.dot",
+                "description": "Canonical alias of the downstream GNode. Provided for readability, registry lookup, and human interpretability. MUST correspond to ToGNodeId."
+                },
+                "Status": {
+                "$ref": "https://schemas.electricity.works/enums/g.node.status/000",
+                "description": "Lifecycle status of this ConnectivityEdge within the registry and coordination system. An edge with Status \"Active\" participates in topology modeling and graph-based computations. Edges with Status \"Suspended\" or \"PermanentlyDeactivated\" SHALL be excluded from active coordination and SHALL NOT be included in topology or power-flow graph construction.\n\nStatus represents administrative lifecycle state only and SHALL NOT be used to represent operational switching state (e.g., breaker open or closed)."
+                },
+                "TypeName": {
+                "const": "connectivity.edge.gt"
+                },
+                "Version": {
+                "const": "000"
+                }
+            },
+            "required": [
+                "Id",
+                "FromGNodeId",
+                "ToGNodeId",
+                "FromGNodeAlias",
+                "ToGNodeAlias",
+                "Status",
+                "TypeName",
+                "Version"
+            ],
+            "additionalProperties": false,
+            "examples": [
+                "{\n  \"Id\": \"9cff2689-eadc-4577-94ea-6d86d0d23e9e\",\n  \"FromGNodeId\": \"86f3c021-e217-4197-b55f-547a7ab88c30\",\n  \"ToGNodeId\": \"f47ac10b-58cc-4372-a567-0e02b2c3d479\",\n  \"FromGNodeAlias\": \"d1.isone.me.versant.keene\",\n  \"ToGNodeAlias\": \"d1.isone.me.versant.keene.beech\",\n  \"Status\": \"Active\",\n  \"TypeName\": \"connectivity.edge.gt\",\n  \"Version\": \"000\"\n}"
+            ],
+            "x-gridworks": {
+                "owner": "gridworks-energy",
+                "axioms": [
+                {
+                    "number": 1,
+                    "name": "NoSelfLoop",
+                    "statement": "FromGNodeId SHALL NOT equal ToGNodeId."
+                }
+                ],
+                "extended_description": "ConnectivityEdge represents structural conductor adjacency only. Most edges correspond directly to parent–child relationships in the GNode hierarchy (for example, substation to feeder or feeder to downstream connectivity node). In these cases, the directed edge makes explicit the physical copper relationship already implied by the structural topology.\n\nHowever, real distribution systems may contain tie-lines, loops, and alternate routing paths. The graph formed by ConnectivityEdge objects MAY therefore contain cycles. Acyclicity is not assumed.\n\nThe directed orientation of a ConnectivityEdge establishes a positive reference direction for flow modeling and graph traversal. It does NOT restrict physical power flow to a single direction. Reverse flow SHALL be represented by sign conventions in power quantities rather than by duplicating edges in the opposite direction.\n\nStatus expresses lifecycle participation of the edge in the registry and coordination system. It SHALL NOT be interpreted as operational switching state (e.g., breaker open or closed). Operational configuration of the active network graph MUST be modeled using separate types designed for dynamic topology state.\n\nConceptually, ConnectivityEdge aligns with the conductor adjacency relationships represented in IEC 61970/61968 CIM (Common Information Model), where network topology is derived from connections between ConnectivityNodes through conducting equipment. ConnectivityEdge provides a simplified, distribution-level abstraction suitable for graph-based modeling and transactive coordination without adopting the full CIM equipment hierarchy."
+            }
+        }
+      },
+      "g.node.gt": {
+        "004":{
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://schemas.electricity.works/types/g.node.gt/004",
+            "title": "g.node.gt",
+            "type": "object",
+            "description": "A GNode (“Grid Node”) is the fundamental identity object in the GridWorks ecosystem. Every physical location, metered unit, device, service, or actor interacting with the transactive system is represented as a GNode.",
+            "properties": {
+                "GNodeId": {
+                "$ref": "https://schemas.electricity.works/formats/uuid4.str",
+                "description": "Globally unique identifier for this GNode. Immutable for the lifetime of the GNode."
+                },
+                "Alias": {
+                "$ref": "https://schemas.electricity.works/formats/left.right.dot",
+                "description": "Human-readable hierarchical identifier. Forms the basis of the GNodeTree topology. Alias may change over time as the physical or conceptual topology is refined."
+                },
+                "BaseClass": {
+                "$ref": "https://schemas.electricity.works/enums/base.g.node.class/000",
+                "description": "Universal structural ontology classification for the GNode. Defines the physical or logical topology role used for interoperability, copper-tree construction, and market coordination across organizations."
+                },
+                "GNodeClass": {
+                "type": "string",
+                "description": "Functional or service-level classification for the GNode. Intentionally namespace-scoped and organization-defined. Does not alter structural interoperability, which is governed by BaseClass."
+                },
+                "Status": {
+                "$ref": "https://schemas.electricity.works/enums/g.node.status/000",
+                "description": "Lifecycle status of the GNode within the registry."
+                },
+                "PrevAlias": {
+                "anyOf": [
+                    { "$ref": "https://schemas.electricity.works/formats/left.right.dot" },
+                    { "type": "null" }
+                ],
+                "description": "Previous Alias value during alias transitions. Required only when Alias changes. Must be null if Alias has not changed."
+                },
+                "PositionPointId": {
+                "anyOf": [
+                    { "$ref": "https://schemas.electricity.works/formats/uuid4.str" },
+                    { "type": "null" }
+                ],
+                "description": "Reference to a PositionPoint GT type giving physical location (WGS84 microdegrees). Required for physical GNodes; null for logical/service nodes."
+                },
+                "DisplayName": {
+                "anyOf": [
+                    { "type": "string" },
+                    { "type": "null" }
+                ],
+                "description": "Optional human-friendly label for UI or documentation."
+                },
+                "TypeName": {
+                "const": "g.node.gt"
+                },
+                "Version": {
+                "const": "004"
+                }
+            },
+            "required": [
+                "GNodeId",
+                "Alias",
+                "BaseClass",
+                "GNodeClass",
+                "Status",
+                "TypeName",
+                "Version"
+            ],
+            "additionalProperties": false,
+            "examples": [
+                {
+                "GNodeId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                "Alias": "d1.isone.me.versant.keene.beech",
+                "BaseClass": "LeafTransactiveNode",
+                "GNodeClass": "LeafTransactiveNode",
+                "Status": "Active",
+                "PositionPointId": "198ca6af-5a4b-43a2-a8a9-7546deabc731",
+                "DisplayName": "Beech Street Meter",
+                "TypeName": "g.node.gt",
+                "Version": "004"
+                },
+                {
+                "GNodeId": "dcb05390-5bca-40ef-b63d-7908ccb33d9b",
+                "Alias": "d1.isone.me.ws",
+                "BaseClass": "Logical",
+                "GNodeClass": "WeatherForecastService",
+                "Status": "Active",
+                "DisplayName": "New England Weather Forecast Service",
+                "TypeName": "g.node.gt",
+                "Version": "004"
+                }
+            ],
+            "x-gridworks": {
+                "owner": "gridworks-energy",
+                "axioms": [
+                {
+                    "number": 1,
+                    "name": "PhysicalClassAlignment",
+                    "statement": "For physical GNodes (BaseClass != Logical), GNodeClass SHALL equal the string value of BaseClass."
+                },
+                {
+                    "number": 2,
+                    "name": "PhysicalGNodeLocations",
+                    "statement": "If BaseClass != Logical, PositionPointId SHALL NOT be null."
+                },
+                {
+                    "number": 3,
+                    "name": "AliasTransitionConsistency",
+                    "statement": "If PrevAlias is not null, it SHALL differ from Alias. If PrevAlias is null, no alias transition is represented in this snapshot."
+                },
+                {
+                    "number": 4,
+                    "name": "GNodeClassNamespacing",
+                    "statement": "GNodeClass SHALL be a non-empty string. It SHALL NOT contain whitespace."
+                }
+                ],
+                "extended_description": "Grid Nodes (GNodes) provide the stable identity layer for distributed coordination in the GridWorks ecosystem. Each GNode participates in a hierarchical alias structure that encodes topology, routing semantics, and coordination scope.\n\nGNodes may represent physical grid structure (e.g., metered boundaries, connectivity nodes, constraint points) or logical and service roles (e.g., SCADA agents, forecasting services, market participants). BaseClass defines the universal structural ontology required for interoperability. GNodeClass expresses organization-specific functional roles and does not alter structural semantics.\n\n`g.node.gt` is an immutable serialized snapshot of declared node state. Any change to a GNode (alias updates, status changes, relocations, or classification changes) SHALL be represented by publishing a new `g.node.gt` message rather than mutating a previously published instance. This preserves durable identity (GNodeId) while allowing controlled evolution of descriptive attributes.\n\nGNode is designed as the atomic unit of coordination in a recursively composable grid architecture. Systems of arbitrary scale are formed by composing GNodes into hierarchical or heterarchical structures. This allows optimal power flow (OPF), market clearing, and constraint coordination mechanisms to operate centrally, regionally, or in distributed configurations without altering the underlying identity model.\n\nConceptually, GNode aligns with node abstractions in IEC 61970/61968 CIM (e.g., ConnectivityNode and TopologicalNode), while unifying physical and logical coordination entities within a single identity abstraction suitable for graph-based modeling and transactive coordination."
+            }
+            }
+      },
+      "position.point.gt":{
+         "000":
+            {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://schemas.electricity.works/types/position.point.gt/000",
+            "title": "position.point.gt",
+            "type": "object",
+            "description": "A geographic position for a physical Grid Node. Coordinates are stored in integer microdegrees (degrees × 1,000,000). This type is conceptually aligned with the IEC 61970/61968 CIM `PositionPoint` class, but simplified for GridWorks use cases, which require only a single latitude/longitude point.",
+            "properties": {
+                "Id": {
+                "$ref": "https://schemas.electricity.works/formats/uuid4.str",
+                "description": "Globally unique identifier for this PositionPoint. Serves as the primary key in the Grid Node Registry."
+                },
+                "LatitudeMicroDeg": {
+                "type": "integer",
+                "minimum": -90000000,
+                "maximum": 90000000,
+                "description": "Latitude in microdegrees. Must fall between -90,000,000 and 90,000,000 inclusive (corresponding to -90.0° to +90.0° in WGS84)."
+                },
+                "LongitudeMicroDeg": {
+                "type": "integer",
+                "minimum": -180000000,
+                "maximum": 180000000,
+                "description": "Longitude in microdegrees. Must fall between -180,000,000 and 180,000,000 inclusive (corresponding to -180.0° to +180.0° in WGS84)."
+                },
+                "TypeName": {
+                "const": "position.point.gt"
+                },
+                "Version": {
+                "const": "000"
+                }
+            },
+            "required": [
+                "Id",
+                "LatitudeMicroDeg",
+                "LongitudeMicroDeg",
+                "TypeName",
+                "Version"
+            ],
+            "additionalProperties": false,
+            "examples": [
+                {
+                "Id": "198ca6af-5a4b-43a2-a8a9-7546deabc731",
+                "LatitudeMicroDeg": 45657842,
+                "LongitudeMicroDeg": -68708913,
+                "TypeName": "position.point.gt",
+                "Version": "000"
+                }
+            ],
+            "x-gridworks": {
+                "owner": "gridworks-energy",
+                "axioms": [
+                {
+                    "number": 1,
+                    "name": "ValidEarthCoordinates",
+                    "statement": "LatitudeMicroDeg SHALL be between -90,000,000 and 90,000,000 inclusive. LongitudeMicroDeg SHALL be between -180,000,000 and 180,000,000 inclusive."
+                }
+                ],
+                "extended_description": "PositionPoint represents the physical location of a GNode that has spatial meaning within the electric grid, such as TerminalAssets, LeafTransactiveNodes, MarketMaker constraint points, and ConnectivityNodes. Coordinates are expressed in WGS84 (EPSG:4326), the standard global geodetic reference system used by GPS and commonly adopted in utility GIS, mapping, and DERMS integrations.\n\nThis type corresponds to a simplified form of the IEC 61970/61968 CIM `PositionPoint` class. The CIM model supports elevation, coordinate-system definitions, and collections of points for geometric shapes. GridWorks intentionally restricts this type to a single latitude/longitude pair to provide a deterministic and minimal spatial anchor for coordination.\n\nPosition accuracy is not prescribed by this type. The microdegree representation provides sufficient precision to distinguish distribution-level assets (e.g., residential footprints, poles, transformers, substations). The actual positional accuracy of a PositionPoint depends entirely on the source of the underlying geographic data."
+            }
+            }
+      }
+    }
+  }
+}

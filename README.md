@@ -7,7 +7,7 @@ Three SQLAlchemy models exist for
   - `PositionPointSql`
   - `ConnectivityEdgeSql`
 
-and corresponding ASL (application shared language) gt ("gridwork type") types for serialization/deserialization. These types are used for I/O to the registry and also do a certain amount of validation of the structure.
+and corresponding Sema gt ("gridwork type") types for serialization/deserialization. These types are used for I/O to the registry and also do a certain amount of validation of the structure.
 
 Here is how to go back and forth:
 ```
@@ -66,7 +66,7 @@ This follows the GridWorks convention.
   the table.
     - I tried setting up docker-compose.yaml but the postgres roles were failing.
   1. Add history tables 
-  2. Enforce core invariants that aren't caught by ASL
+  2. Enforce core invariants that aren't caught by Sema
      - Alias Uniqueness through time
      - Active GNode tree must be parent-closed
      - Active physical GNode subtree must be parent-closed

@@ -1,15 +1,15 @@
 from typing import Literal
 
-from gnr.asl.base import AslType
+from gnr.sema.base import SemaType
 from pydantic import StrictInt, model_validator
 from typing_extensions import Self
 
-from gnr.asl.property_format import UUID4Str
+from gnr.sema.property_format import UUID4Str
 
 
-class PositionPointGt(AslType):
+class PositionPointGt(SemaType):
     """
-    ASL type schema:
+    Sema:
     [https://schemas.electricity.works/types/position.point.gt/000](https://schemas.electricity.works/types/position.point.gt/000)
     """
     id: UUID4Str

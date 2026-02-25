@@ -1,17 +1,14 @@
-from enum import auto
 from typing import List
+from gnr.sema.enums.gw_str_enum import GwStrEnum
 
-from gnr.asl.enums.gw_str_enum import GwStrEnum
 
 class GNodeStatus(GwStrEnum):
-    """
-    ASL enum schema:
-    [https://schemas.electricity.works/enums/g.node.status/000](https://schemas.electricity.works/enums/g.node.status/000)
-    """
-    Pending = auto()
-    Active = auto()
-    PermanentlyDeactivated = auto()
-    Suspended = auto()
+    """Sema: https://schemas.electricity.works/enums/g.node.status/000"""
+
+    Pending = "Pending"
+    Active = "Active"
+    Suspended = "Suspended"
+    PermanentlyDeactivated = "PermanentlyDeactivated"
 
     @classmethod
     def default(cls) -> "GNodeStatus":
