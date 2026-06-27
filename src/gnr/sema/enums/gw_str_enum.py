@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Any, List, Optional, Self
+from typing import Any, Self
 
 
 class GwStrEnum(StrEnum):
@@ -10,7 +10,7 @@ class GwStrEnum(StrEnum):
 
     Specifically (re difference with python StrEnum) if
 
-    class Foo(GwStrEnum):
+    class Foo(Enum):
         Bar = auto()
 
     then
@@ -33,18 +33,35 @@ class GwStrEnum(StrEnum):
         return [str(elt) for elt in cls]
 
     @classmethod
-    def default(cls) -> Optional[Self]:
+    def default(cls) -> Self | None:
         return None
 
     @classmethod
-    def _missing_(cls, value: str) -> Self:
+    def _missing_(cls, value: object) -> Self:
         default = cls.default()
         if default is None:
             raise ValueError(f"'{value}' is not valid {cls.__name__}")
         return default
 
 
-class SymbolizedEnum(GwStrEnum):
+class SemaEnum(GwStrEnum):
+    """
+    Base for enums published in Sema.
+    Requires enum_name(). Version is optional (return None for stable enums).
+    """
+
+    @classmethod
+    def enum_name(cls) -> str:
+        """Sema identifier (e.g., 'gw1.relay.state')"""
+        raise NotImplementedError(f"{cls.__name__} must implement enum_name() for Sema")
+
+    @classmethod
+    def enum_version(cls) -> str:
+        """Sema identifier (e.g., '000')"""
+        raise NotImplementedError(f"{cls.__name__} must implement enum_name() for Sema")
+
+
+class SymbolizedEnum(SemaEnum):
     @classmethod
     def symbol_to_value(cls, symbol: str) -> str:
         raise NotImplementedError
@@ -54,5 +71,5 @@ class SymbolizedEnum(GwStrEnum):
         raise NotImplementedError
 
     @classmethod
-    def symbols(cls) -> List[str]:
+    def symbols(cls) -> list[str]:
         raise NotImplementedError

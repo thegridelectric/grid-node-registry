@@ -1,0 +1,91 @@
+metadata:
+  registry_version: "1.0"
+  last_updated: "2026-06-26T03:40:00Z"
+  maintainer: "gridworks-energy"
+
+formats:
+  left.right.dot:
+    owner: gridworks-energy
+    schema_url: "https://schemas.electricity.works/formats/left.right.dot"
+    created: "2022-01-01T00:00:00Z"
+    description: "Dot-separated hierarchical identifier composed of lowercase alphanumeric segments"
+
+  uuid4.str:
+    owner: gridworks-energy
+    schema_url: "https://schemas.electricity.works/formats/uuid4.str"
+    created: "2024-09-02T15:00:00Z"
+    description: "Canonical lowercase UUIDv4 string (RFC 4122) in 8-4-4-4-12 format"
+
+enums:
+  base.g.node.class:
+    latest_version: "000"
+    owner: gridworks-energy
+    enum_type: "versioned"
+    description: "Universal physical ontology classification for Grid Nodes"
+
+    versions:
+      "000":
+        schema_url: "https://schemas.electricity.works/enums/base.g.node.class/000"
+        created: "2026-02-22T16:43:00Z"
+
+  g.node.status:
+    latest_version: "000"
+    owner: gridworks-energy
+    enum_type: "versioned"
+    description: "Lifecycle status of a Grid Node within the registry"
+
+    versions:
+      "000":
+        schema_url: "https://schemas.electricity.works/enums/g.node.status/000"
+        created: "2026-02-22T16:43:00Z"
+
+types:
+  connectivity.edge.gt:
+    latest_version: "000"
+    owner: gridworks-energy
+    versioning_strategy: "literal"
+    description: "Directed topological edge connecting two Grid Nodes in the physical electric network"
+
+    versions:
+      "000":
+        schema_url: "https://schemas.electricity.works/types/connectivity.edge.gt/000"
+        created: "2026-02-23T00:00:00Z"
+        summary: "Initial Sema version"
+        direct_dependencies:
+          structural:
+            - "g.node.status:000"
+            - "left.right.dot"
+            - "uuid4.str"
+
+  g.node.gt:
+    latest_version: "004"
+    owner: gridworks-energy
+    versioning_strategy: "literal"
+    description: "Fundamental identity object representing physical and logical grid nodes"
+
+    versions:
+      "004":
+        schema_url: "https://schemas.electricity.works/types/g.node.gt/004"
+        created: "2026-02-24T14:00:00Z"
+        summary: "Baseline runtime version (no prior version tracked)."
+        direct_dependencies:
+          structural:
+            - "base.g.node.class:000"
+            - "g.node.status:000"
+            - "left.right.dot"
+            - "uuid4.str"
+
+  position.point.gt:
+    latest_version: "000"
+    owner: gridworks-energy
+    versioning_strategy: "literal"
+    description: "Geographic position expressed in integer microdegrees (WGS84)"
+
+    versions:
+      "000":
+        schema_url: "https://schemas.electricity.works/types/position.point.gt/000"
+        created: "2026-02-24T15:00:00Z"
+        summary: "Initial Sema version"
+        direct_dependencies:
+          structural:
+            - "uuid4.str"

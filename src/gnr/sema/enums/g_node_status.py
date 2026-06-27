@@ -1,21 +1,22 @@
-from typing import List
-from gnr.sema.enums.gw_str_enum import GwStrEnum
+from enum import auto
+
+from gnr.sema.enums.gw_str_enum import SemaEnum
 
 
-class GNodeStatus(GwStrEnum):
+class GNodeStatus(SemaEnum):
     """Sema: https://schemas.electricity.works/enums/g.node.status/000"""
 
-    Pending = "Pending"
-    Active = "Active"
-    Suspended = "Suspended"
-    PermanentlyDeactivated = "PermanentlyDeactivated"
+    Pending = auto()
+    Active = auto()
+    Suspended = auto()
+    PermanentlyDeactivated = auto()
 
     @classmethod
     def default(cls) -> "GNodeStatus":
         return cls.Pending
 
     @classmethod
-    def values(cls) -> List[str]:
+    def values(cls) -> list[str]:
         return [elt.value for elt in cls]
 
     @classmethod

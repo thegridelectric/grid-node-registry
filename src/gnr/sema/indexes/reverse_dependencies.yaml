@@ -1,0 +1,24 @@
+# GENERATED FILE - DO NOT EDIT
+# Generated from definitions/registry.yaml
+
+types: {}
+enums:
+  base.g.node.class:
+    '000':
+      used_by:
+      - g.node.gt:004
+  g.node.status:
+    '000':
+      used_by:
+      - connectivity.edge.gt:000
+      - g.node.gt:004
+formats:
+  left.right.dot:
+    used_by:
+    - connectivity.edge.gt:000
+    - g.node.gt:004
+  uuid4.str:
+    used_by:
+    - connectivity.edge.gt:000
+    - g.node.gt:004
+    - position.point.gt:000
