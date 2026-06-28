@@ -15,7 +15,6 @@ enums:
 formats:
   left.right.dot:
     used_by:
-    - connectivity.edge.gt:000
     - g.node.gt:004
   uuid4.str:
     used_by:

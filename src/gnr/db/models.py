@@ -147,9 +147,6 @@ class ConnectivityEdgeSql(Base):
         ForeignKey("g_nodes.id"), index=True
     )
 
-    from_g_node_alias: Mapped[str] = mapped_column(String, index=True)
-    to_g_node_alias: Mapped[str] = mapped_column(String, index=True)
-
     status: Mapped[GNodeStatus] = mapped_column(
         Enum(GNodeStatus, name="connectivity_edge_status")
     )
@@ -174,8 +171,6 @@ class ConnectivityEdgeSql(Base):
             id=self.id,
             from_g_node_id=self.from_g_node_id,
             to_g_node_id=self.to_g_node_id,
-            from_g_node_alias=self.from_g_node_alias,
-            to_g_node_alias=self.to_g_node_alias,
             status=self.status,
         )
 
@@ -185,7 +180,5 @@ class ConnectivityEdgeSql(Base):
             id=gt.id,
             from_g_node_id=gt.from_g_node_id,
             to_g_node_id=gt.to_g_node_id,
-            from_g_node_alias=gt.from_g_node_alias,
-            to_g_node_alias=gt.to_g_node_alias,
             status=gt.status,
         )
