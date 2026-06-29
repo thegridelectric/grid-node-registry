@@ -19,6 +19,17 @@ dependencies = [
 [project.scripts]
 gnr = "gnr:main"
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: needs a live Postgres and/or broker (the dev-universe harness layers); self-skips otherwise",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
