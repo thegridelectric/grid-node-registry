@@ -1,4 +1,3 @@
-# NOTE:THIS DID NOT WORK WITH MAKING A FIRST ALEMBIC VERSION
 services:
   postgres:
     image: postgres:16
@@ -9,7 +8,11 @@ services:
       POSTGRES_PASSWORD: gnrpass
       POSTGRES_DB: gnr
     ports:
-      - "5432:5432"
+      # Host 5435 → container 5432. Not 5432: a host-local Postgres commonly
+      # holds 127.0.0.1:5432 and macOS resolves localhost→::1 first, so a
+      # 5432:5432 publish gets shadowed ("role gnr does not exist"). 5433/5434
+      # are taken by sibling gridworks containers (gw-data-pg); 5435 is free.
+      - "5435:5432"
     volumes:
       - gnr_pgdata:/var/lib/postgresql/data
     healthcheck:

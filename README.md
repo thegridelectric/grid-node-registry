@@ -46,14 +46,36 @@ cp template.env .env
  2. Edit the `.env` file to include your database credentials and any overrides.
 
 
+## Local Postgres (dev)
+
+A `docker-compose.yaml` runs a Postgres 16 for development:
+
+```
+docker compose up -d           # starts container `gnr-postgres`
+```
+
+It publishes the container's 5432 on **host port 5435** (not 5432): a
+host-local Postgres commonly holds `127.0.0.1:5432`, and macOS resolves
+`localhost` to `::1` first, so a `5432:5432` publish gets shadowed and you see
+`role "gnr" does not exist`. The matching URL is in `template.env`
+(`postgresql+psycopg://gnr:gnrpass@localhost:5435/gnr`) — note the `+psycopg`
+driver (psycopg v3, the installed one). If you ever change the container's
+credentials, remove the named volume first (`docker compose down` then
+`docker volume rm gnr_pgdata`) — Postgres only runs its init on an empty data
+dir, so a stale volume keeps the old roles.
+
 ## Database change management
 
-Using alembic for change managmenet. E.g.
+Using alembic for change management. E.g.
 
 ```
 uv run alembic revision --autogenerate -m "description e.g. initial schema"
 uv run alembic upgrade head
 ```
+
+The initial migration (all three tables) is committed under
+`alembic/versions/`; `uv run alembic upgrade head` against a fresh dev Postgres
+creates the schema.
 ## Logs
 By default, logs should be written to
 ```
@@ -62,9 +84,10 @@ By default, logs should be written to
 This follows the GridWorks convention.
 
 ## Next steps.
-  0. Set up a dev environment for postgres and then use alembic to generate
-  the table.
-    - I tried setting up docker-compose.yaml but the postgres roles were failing.
+  0. ~~Set up a dev environment for postgres and then use alembic to generate
+  the table.~~ **Done** — `docker compose up -d` (host port 5435), then
+  `uv run alembic upgrade head`. A `GNodeGt` round-trips against the live DB
+  (`gt → GNodeSql.from_gt → session → to_gt`). See *Local Postgres (dev)* above.
   1. Add history tables 
   2. Enforce core invariants that aren't caught by Sema
      - Alias Uniqueness through time
