@@ -20,6 +20,22 @@ return codec.encode(gt)
 
 ```
 
+## Universes
+
+Every GNode alias begins with a **universe** segment, and its first letter is the
+kind: `d` = dev, `h` = hybrid, `w` = production. There are many dev/hybrid
+universes (`d1`, `d2`, `hw1`, …) and exactly one production universe — the only
+place real money moves. A registry instance is scoped to a single universe:
+
+```
+universe_of(alias) = alias.split(".")[0]     # d1.isone.me.versant.keene.beech -> d1
+```
+
+A **dev universe** mirrors the deployed production systems re-aliased into `d1.*`,
+so the registry (and the services around it) can be exercised end-to-end against a
+real broker and database without touching real money. The test harness is built as
+such a dev universe.
+
 ## Requirements
 
 Python version requirement: 3.12.x

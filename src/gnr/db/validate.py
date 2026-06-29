@@ -30,6 +30,13 @@ from gnr.sema.enums import BaseGNodeClass, GNodeStatus
 from gnr.db.models import ConnectivityEdgeSql, GNodeSql
 
 
+# A **CopperNode** is the copper-topology backbone class — a ConnectivityNode or a
+# MarketMaker (a MarketMaker is a ConnectivityNode that also runs a local market).
+# The backbone is parent-closed: a CopperNode's parent is the world root or another
+# CopperNode.
+COPPER_CLASSES = frozenset({BaseGNodeClass.ConnectivityNode, BaseGNodeClass.MarketMaker})
+
+
 @dataclass(frozen=True)
 class Violation:
     invariant: str
@@ -118,12 +125,16 @@ def check_class_hierarchy(nodes_by_alias: dict[str, GNodeSql]) -> list[Violation
       - LeafTransactiveNode → parent is a ConnectivityNode / MarketMaker;
       - TerminalAsset → parent is a LeafTransactiveNode (it sits behind an
         atomic-metered point);
-      - Logical → unconstrained (a non-physical node carries no topology rule).
+      - Scada (`g_node_class == "Scada"`, Logical base_class) → parent is a
+        LeafTransactiveNode (it represents that metered unit's controller);
+      - other Logical → unconstrained (a non-physical node carries no topology rule).
+
+    (The alias suffixes `.ta`/`.scada` are enforced per-row by `g.node.gt` Sema
+    axiom 5, not here.)
 
     Structural (class-only) — independent of status; existence of the parent is
     `check_parent_closed_active`'s job, so a missing parent is skipped here.
     """
-    physical_parents = (BaseGNodeClass.ConnectivityNode, BaseGNodeClass.MarketMaker)
     violations: list[Violation] = []
     for node in nodes_by_alias.values():
         if is_root(node.alias):
@@ -132,21 +143,26 @@ def check_class_hierarchy(nodes_by_alias: dict[str, GNodeSql]) -> list[Violation
         if parent is None:
             continue
         bc, pbc = node.base_class, parent.base_class
-        if bc in physical_parents:
-            ok = is_root(parent.alias) or pbc in physical_parents
-            allowed = "the world root, a ConnectivityNode, or a MarketMaker"
+        kind = bc.value
+        if bc in COPPER_CLASSES:
+            ok = is_root(parent.alias) or pbc in COPPER_CLASSES
+            allowed = "the world root or a CopperNode (ConnectivityNode/MarketMaker)"
         elif bc == BaseGNodeClass.LeafTransactiveNode:
-            ok = pbc in physical_parents
-            allowed = "a ConnectivityNode or a MarketMaker"
+            ok = pbc in COPPER_CLASSES
+            allowed = "a CopperNode (ConnectivityNode/MarketMaker)"
         elif bc == BaseGNodeClass.TerminalAsset:
             ok = pbc == BaseGNodeClass.LeafTransactiveNode
             allowed = "a LeafTransactiveNode"
-        else:  # Logical — unconstrained
+        elif node.g_node_class == "Scada":  # Logical base_class, but anchored to its home LTN
+            kind = "Scada"
+            ok = pbc == BaseGNodeClass.LeafTransactiveNode
+            allowed = "a LeafTransactiveNode"
+        else:  # other Logical — unconstrained
             continue
         if not ok:
             violations.append(Violation(
                 "class_hierarchy", node.id, node.alias,
-                f"a {bc.value} must have a parent that is {allowed}; "
+                f"a {kind} must have a parent that is {allowed}; "
                 f"parent {parent.alias!r} is a {pbc.value}",
             ))
     return violations

@@ -7,9 +7,9 @@ trivial to unit-test.
 
 Grounded in legacy `g-node-factory`:
   - status SM = Update Axiom 3;
-  - `base_class` SM = the constrained-mutable upgrade a ConnectivityNode makes to
-    MarketMaker (it gains authority to re-parent its sub-topology when a
-    copper-topology shift becomes a known constraint). `g_node_class` moves in
+  - `base_class` SM = a CopperNode switching between its two forms, both
+    directions — ConnectivityNode ⇄ MarketMaker (a constraint emerges → a market
+    is needed; a constraint is relieved → it isn't). `g_node_class` moves in
     lockstep with `base_class` (per-row Sema axiom 1), so the GT codec keeps the
     two consistent; this SM governs only which `base_class` change is allowed.
 """
@@ -39,9 +39,13 @@ ALLOWED_STATUS_TRANSITIONS: dict[GNodeStatus, frozenset[GNodeStatus]] = {
     GNodeStatus.PermanentlyDeactivated: frozenset(),  # terminal
 }
 
-# The only sanctioned non-identity base_class change: ConnectivityNode -> MarketMaker.
+# A CopperNode may change between its two forms, both directions:
+#   ConnectivityNode -> MarketMaker  (a copper constraint emerges; the node must run a local market)
+#   MarketMaker -> ConnectivityNode  (the constraint is relieved on the grid; no market maker needed)
+# No other base_class change is sanctioned.
 ALLOWED_BASE_CLASS_TRANSITIONS: dict[BaseGNodeClass, frozenset[BaseGNodeClass]] = {
     BaseGNodeClass.ConnectivityNode: frozenset({BaseGNodeClass.MarketMaker}),
+    BaseGNodeClass.MarketMaker: frozenset({BaseGNodeClass.ConnectivityNode}),
 }
 
 
