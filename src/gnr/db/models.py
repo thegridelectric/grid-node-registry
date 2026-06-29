@@ -182,3 +182,29 @@ class ConnectivityEdgeSql(Base):
             to_g_node_id=gt.to_g_node_id,
             status=gt.status,
         )
+
+
+# ============================================================
+#  ALIAS ASSIGNMENT LEDGER
+# ============================================================
+
+class AliasAssignmentSql(Base):
+    """Append-only record of alias→GNodeId ownership, for all time.
+
+    The `alias` primary key is the guarantee for the *alias-uniqueness-through-
+    time* invariant: an alias, once bound to a `GNodeId`, is permanently owned by
+    it and can never bind to a different one — even after the node renames away
+    from it. `g_nodes.alias UNIQUE` only enforces *live* uniqueness (a rename
+    frees the old value in that row), so the permanent binding lives here.
+    Written on every create and every rename via `gnr.db.alias_ledger.claim_alias`.
+    """
+
+    __tablename__ = "alias_assignment"
+
+    alias: Mapped[str] = mapped_column(String, primary_key=True)
+    g_node_id: Mapped[str] = mapped_column(
+        ForeignKey("g_nodes.id"), nullable=False, index=True
+    )
+    first_assigned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+    )
