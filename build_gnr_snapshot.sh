@@ -13,6 +13,6 @@ cd "$sema_root"
 uv run sema snapshot prepare "$seed"
 uv run sema snapshot build --package-name gnr
 
-rsync -a --delete --exclude='__pycache__' --exclude='.DS_Store' --exclude='README.md' \
+rsync -a --delete --exclude='__pycache__' --exclude='.DS_Store' \
   output/sema/ "$gnr_root/src/gnr/sema/"
 echo "gnr snapshot rebuilt (local names from seed request) + copied to src/gnr/sema/."
