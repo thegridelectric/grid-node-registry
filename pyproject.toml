@@ -10,11 +10,15 @@ requires-python = ">=3.12,<3.13.0"
 dependencies = [
     "alembic>=1.17.2",
     "fastapi>=0.123.0",
+    "gridworks-base",
     "psycopg[binary]>=3.1",
     "pydantic-settings>=2.12.0",
     "sqlalchemy>=2.0.44",
     "uvicorn[standard]>=0.38.0",
 ]
+
+[tool.uv.sources]
+gridworks-base = { path = "../gridworks-base", editable = true }
 
 [project.scripts]
 gnr = "gnr:main"
