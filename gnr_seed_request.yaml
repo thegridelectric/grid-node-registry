@@ -23,3 +23,5 @@ initial_targets:
     g.node.gt: {}
     connectivity.edge.gt: {}
     position.point.gt: {}
+    g.node.reparent.cmd: {}
+    g.node.topology.broadcast: {}
