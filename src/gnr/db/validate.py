@@ -1,0 +1,167 @@
+"""Whole-registry structural invariants Sema can't express per-row.
+
+These are the invariants from `executor/primary.md` "Intended invariants" that
+span *rows* — parent-closure and edge coverage. `validate_registry` scans the
+committed registry and returns every violation (the audit pass); the write
+handlers (step 5) will run the relevant check on the affected subtree at write
+time. Topology is derived from the dotted alias: a node's parent is its alias
+with the last word dropped (`parent_alias`), so the parent relation is
+self-evident from the alias and there is no separate parent pointer to keep
+consistent.
+
+The role/class **hierarchy** parent rule (what `BaseGNodeClass` may parent what)
+is the new-class form of legacy `g-node-factory` Creation Axiom 5 (ROLE), with
+the legacy→new mapping `ConductorTopologyNode → ConnectivityNode`,
+`AtomicTNode`/`AtomicMeteringNode → LeafTransactiveNode`, `Scada`/`Other →
+Logical` (confirmed by the `base.g.node.class` value-descriptions). Because the
+physical classes only ever parent physical classes (a TerminalAsset sits behind
+an atomic-metered LeafTransactiveNode, which sits under a ConnectivityNode/
+MarketMaker, up to the world root), enforcing the hierarchy also gives "the
+active physical subtree is parent-closed" as a consequence.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from sqlalchemy.orm import Session
+
+from gnr.sema.enums import BaseGNodeClass, GNodeStatus
+from gnr.db.models import ConnectivityEdgeSql, GNodeSql
+
+
+@dataclass(frozen=True)
+class Violation:
+    invariant: str
+    g_node_id: str
+    alias: str
+    detail: str
+
+
+def is_root(alias: str) -> bool:
+    """A root alias is a single word (no dot) — the root of a world."""
+    return "." not in alias
+
+
+def parent_alias(alias: str) -> str | None:
+    """The alias-parent: `alias` with its last dotted word dropped, or None for a root."""
+    if is_root(alias):
+        return None
+    return alias.rsplit(".", 1)[0]
+
+
+def check_parent_closed_active(nodes_by_alias: dict[str, GNodeSql]) -> list[Violation]:
+    """Active non-root nodes have an existing, Active alias-parent.
+
+    The active GNode tree is parent-closed: no active node dangles under a
+    missing, suspended, or deactivated parent.
+    """
+    violations: list[Violation] = []
+    for node in nodes_by_alias.values():
+        if node.status != GNodeStatus.Active or is_root(node.alias):
+            continue
+        p_alias = parent_alias(node.alias)
+        parent = nodes_by_alias.get(p_alias)
+        if parent is None:
+            violations.append(Violation(
+                "parent_closed_active", node.id, node.alias,
+                f"active non-root node has no parent at alias {p_alias!r}",
+            ))
+        elif parent.status != GNodeStatus.Active:
+            violations.append(Violation(
+                "parent_closed_active", node.id, node.alias,
+                f"parent {p_alias!r} is {parent.status.value}, not Active",
+            ))
+    return violations
+
+
+def check_edge_coverage(
+    nodes_by_alias: dict[str, GNodeSql], active_edges: list[ConnectivityEdgeSql]
+) -> list[Violation]:
+    """Every active non-root node has exactly one active edge, from its parent.
+
+    For node `A` with alias-parent `P`, the registry holds exactly one active
+    `ConnectivityEdge(from=P.id, to=A.id)` — no missing edge, no extra incoming
+    edge, and the one edge comes from the alias-parent (not some other node).
+    """
+    incoming: dict[str, list[str]] = {}
+    for edge in active_edges:
+        incoming.setdefault(edge.to_g_node_id, []).append(edge.from_g_node_id)
+
+    violations: list[Violation] = []
+    for node in nodes_by_alias.values():
+        if node.status != GNodeStatus.Active or is_root(node.alias):
+            continue
+        froms = incoming.get(node.id, [])
+        if len(froms) != 1:
+            violations.append(Violation(
+                "edge_coverage", node.id, node.alias,
+                f"expected exactly one active incoming edge, found {len(froms)}",
+            ))
+            continue
+        parent = nodes_by_alias.get(parent_alias(node.alias))
+        if parent is None or froms[0] != parent.id:
+            violations.append(Violation(
+                "edge_coverage", node.id, node.alias,
+                f"sole active incoming edge is from {froms[0]!r}, "
+                f"not the alias-parent {parent_alias(node.alias)!r}",
+            ))
+    return violations
+
+
+def check_class_hierarchy(nodes_by_alias: dict[str, GNodeSql]) -> list[Violation]:
+    """Each non-root node's parent class is legal for its own class.
+
+    The new-class form of legacy Creation Axiom 5 (ROLE):
+      - ConnectivityNode / MarketMaker → parent is the world root, or a
+        ConnectivityNode / MarketMaker;
+      - LeafTransactiveNode → parent is a ConnectivityNode / MarketMaker;
+      - TerminalAsset → parent is a LeafTransactiveNode (it sits behind an
+        atomic-metered point);
+      - Logical → unconstrained (a non-physical node carries no topology rule).
+
+    Structural (class-only) — independent of status; existence of the parent is
+    `check_parent_closed_active`'s job, so a missing parent is skipped here.
+    """
+    physical_parents = (BaseGNodeClass.ConnectivityNode, BaseGNodeClass.MarketMaker)
+    violations: list[Violation] = []
+    for node in nodes_by_alias.values():
+        if is_root(node.alias):
+            continue
+        parent = nodes_by_alias.get(parent_alias(node.alias))
+        if parent is None:
+            continue
+        bc, pbc = node.base_class, parent.base_class
+        if bc in physical_parents:
+            ok = is_root(parent.alias) or pbc in physical_parents
+            allowed = "the world root, a ConnectivityNode, or a MarketMaker"
+        elif bc == BaseGNodeClass.LeafTransactiveNode:
+            ok = pbc in physical_parents
+            allowed = "a ConnectivityNode or a MarketMaker"
+        elif bc == BaseGNodeClass.TerminalAsset:
+            ok = pbc == BaseGNodeClass.LeafTransactiveNode
+            allowed = "a LeafTransactiveNode"
+        else:  # Logical — unconstrained
+            continue
+        if not ok:
+            violations.append(Violation(
+                "class_hierarchy", node.id, node.alias,
+                f"a {bc.value} must have a parent that is {allowed}; "
+                f"parent {parent.alias!r} is a {pbc.value}",
+            ))
+    return violations
+
+
+def validate_registry(session: Session) -> list[Violation]:
+    """Run every whole-registry invariant; return all violations (empty = clean)."""
+    nodes_by_alias = {n.alias: n for n in session.query(GNodeSql).all()}
+    active_edges = (
+        session.query(ConnectivityEdgeSql)
+        .filter(ConnectivityEdgeSql.status == GNodeStatus.Active)
+        .all()
+    )
+    return [
+        *check_parent_closed_active(nodes_by_alias),
+        *check_edge_coverage(nodes_by_alias, active_edges),
+        *check_class_hierarchy(nodes_by_alias),
+    ]
