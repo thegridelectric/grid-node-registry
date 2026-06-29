@@ -1,7 +1,12 @@
 # GENERATED FILE - DO NOT EDIT
 # Generated from definitions/registry.yaml
 
-types: {}
+types:
+  g.node.gt:
+    '004':
+      used_by:
+      - g.node.reparent.cmd:000
+      - g.node.topology.broadcast:000
 enums:
   base.g.node.class:
     '000':
@@ -20,4 +25,5 @@ formats:
     used_by:
     - connectivity.edge.gt:000
     - g.node.gt:004
+    - g.node.reparent.cmd:000
     - position.point.gt:000

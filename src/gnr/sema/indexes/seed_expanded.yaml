@@ -1,11 +1,13 @@
 metadata:
   generated_from: indexes/public_registry.yaml
-  generated_at: '2026-06-28T21:22:12Z'
+  generated_at: '2026-06-29T14:03:16Z'
   note: Transitive closure of initial_targets
 initial_targets:
 - g.node.gt:004
 - connectivity.edge.gt:000
 - position.point.gt:000
+- g.node.reparent.cmd:000
+- g.node.topology.broadcast:000
 worklist:
   formats:
     left.right.dot:
@@ -26,6 +28,12 @@ worklist:
     g.node.gt:
       '004':
         path: definitions/types/g.node.gt/004.yaml
+    g.node.reparent.cmd:
+      '000':
+        path: definitions/types/g.node.reparent.cmd/000.yaml
+    g.node.topology.broadcast:
+      '000':
+        path: definitions/types/g.node.topology.broadcast/000.yaml
     position.point.gt:
       '000':
         path: definitions/types/position.point.gt/000.yaml

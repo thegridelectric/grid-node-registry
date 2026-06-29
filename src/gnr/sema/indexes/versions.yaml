@@ -17,6 +17,20 @@ types:
       "004":
         summary: "Baseline runtime version (no prior version tracked)."
 
+  g.node.reparent.cmd:
+    latest_version: "000"
+    versioning_strategy: "literal"
+    versions:
+      "000":
+        summary: "Initial Sema version"
+
+  g.node.topology.broadcast:
+    latest_version: "000"
+    versioning_strategy: "literal"
+    versions:
+      "000":
+        summary: "Initial Sema version"
+
   position.point.gt:
     latest_version: "000"
     versioning_strategy: "literal"
