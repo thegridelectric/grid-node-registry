@@ -11,12 +11,23 @@ working Docker/testcontainers is available, the integration layers self-skip.
 from __future__ import annotations
 
 import os
+from urllib.parse import quote
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from gnr.db.models import Base
+
+
+@pytest.fixture(autouse=True)
+def _xdg_under_tmp(tmp_path_factory, monkeypatch):
+    """Redirect XDG base dirs under tmp so the gwbase actors' per-actor loggers
+    (Layer 2) never touch the real home directory."""
+    base = tmp_path_factory.mktemp("xdg")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(base / "config"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(base / "data"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(base / "state"))
 
 
 @pytest.fixture(scope="session")
@@ -66,3 +77,36 @@ def db_session(session_factory):
     """A single session for direct fixture/test use (seeding, assertions)."""
     with session_factory() as s:
         yield s
+
+
+@pytest.fixture(scope="session")
+def rabbit_url():
+    """A RabbitMQ AMQP URL for Layer 2: compose-opt-in, else testcontainers.
+
+    Set `GNR_TEST_RABBIT_URL` to point at an already-running broker (e.g. the
+    shared `gw-dev-rabbit` on its `d1__1` vhost) for a fast local loop; otherwise
+    an ephemeral `testcontainers` RabbitMQ is started. Self-skips when neither an
+    override nor a working Docker/testcontainers is available.
+    """
+    override = os.environ.get("GNR_TEST_RABBIT_URL")
+    if override:
+        yield override
+        return
+
+    try:
+        from testcontainers.rabbitmq import RabbitMqContainer
+    except ImportError:
+        pytest.skip("no GNR_TEST_RABBIT_URL and testcontainers not installed")
+
+    try:
+        rabbit = RabbitMqContainer("rabbitmq:3.13")
+        rabbit.start()
+    except Exception as e:  # Docker not available / image pull failed
+        pytest.skip(f"could not start a testcontainers RabbitMQ: {e}")
+
+    try:
+        p = rabbit.get_connection_params()
+        vhost = quote(rabbit.vhost or "/", safe="")
+        yield f"amqp://{rabbit.username}:{rabbit.password}@{p.host}:{p.port}/{vhost}"
+    finally:
+        rabbit.stop()

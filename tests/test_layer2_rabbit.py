@@ -1,0 +1,172 @@
+"""Layer 2 — the rabbit adapter over a real broker (the EDD experiment).
+
+Boots `GnrRabbit` (the registry's gwbase actor) and a MarketMaker stub on a real
+RabbitMQ, seeds the `d1` dev universe into a real Postgres, and proves the whole
+step-5 write loop end to end: a MarketMaker publishes a `g.node.reparent.cmd`,
+the fabric forwards it to the registry's `gnr_tx`, the registry applies the atomic
+recursive re-parent, and its `g.node.topology.broadcast` comes back to a real
+subscriber **and** the DB reflects the rewrite. This is the experiment that moves
+the harness spoke toward Verified — mocks pass where the real broker + atomic
+subtree rewrite fail.
+"""
+
+from __future__ import annotations
+
+import json
+import uuid
+
+import pika
+import pytest
+from pydantic import SecretStr
+
+from gwbase import topology
+from gwbase.config import ServiceSettings
+from gwbase.config.rabbit_settings import RabbitBrokerClient
+from gwbase.orchestrator import Orchestrator
+from gwbase.transport_encoding import RoutingEnvelope, TransportClass
+
+from gnr.db.authority import PostgresAuthority
+from gnr.dev_universe import DEV_POSITION, seed_dev_universe
+from gnr.gnr_rabbit import GnrRabbit
+from gnr.sema.codec import default_codec
+from gnr.sema.enums import BaseGNodeClass, GNodeStatus
+from gnr.sema.types import GNodeGt, GNodeReparentCmd, GNodeTopologyBroadcast
+
+pytestmark = pytest.mark.integration
+
+REGISTRY_ALIAS = "d1.registry"
+KEENE = "d1.isone.me.versant.keene"  # a MarketMaker — authority over the beech subtree
+BEECH_LTN = f"{KEENE}.beech"
+TOPOLOGY_BROADCAST = "g.node.topology.broadcast"
+
+
+def provision_topology(url: str) -> None:
+    """Declare the gwbase broker fabric (exchanges + bindings) before any actor
+    starts — actors only *passively* assert their consume exchange exists. Same
+    `gwbase.topology` source the dev/prod definitions are generated from."""
+    conn = pika.BlockingConnection(pika.URLParameters(url))
+    try:
+        ch = conn.channel()
+        for ex in topology.exchanges():
+            ch.exchange_declare(
+                exchange=ex.name,
+                exchange_type=ex.exchange_type,
+                durable=ex.durable,
+                internal=ex.internal,
+            )
+        for b in topology.exchange_bindings():
+            ch.exchange_bind(
+                destination=b.destination, source=b.source, routing_key=b.routing_key
+            )
+    finally:
+        conn.close()
+
+
+class MarketMakerStub(Orchestrator):
+    """A MarketMaker that sends the re-parent command and records the registry's
+    topology broadcast (subscriber-bound to `gnrmic_tx`)."""
+
+    def __init__(self, *, settings: ServiceSettings, registry_alias: str) -> None:
+        super().__init__(
+            settings=settings,
+            transport_class=TransportClass.MarketMaker,
+            my_super_alias="d1.super1",
+            my_time_coordinator_alias="d1.time",
+        )
+        self._registry_alias = registry_alias
+        self.broadcasts: list[bytes] = []
+
+    def local_rabbit_startup(self) -> None:
+        self.subscribe_broadcast(
+            from_alias=self._registry_alias,
+            from_class=TransportClass.GridNodeRegistry,
+            type_name=TOPOLOGY_BROADCAST,
+        )
+
+    def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
+        if envelope.type_name == TOPOLOGY_BROADCAST:
+            self.broadcasts.append(body)
+
+
+def _wait_for(predicate, timeout_s: float, message: str, interval_s: float = 0.1):
+    import time
+
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        if predicate():
+            return
+        time.sleep(interval_s)
+    raise TimeoutError(f"Timed out after {timeout_s}s waiting for: {message}")
+
+
+def test_reparent_over_real_broker(session_factory, rabbit_url):
+    # Seed the dev universe into the real Postgres.
+    with session_factory() as s:
+        gnodes = seed_dev_universe(s)
+    by_alias = {g.alias: g for g in gnodes}
+    beech_ltn = by_alias[BEECH_LTN]
+
+    # Provision the fabric before any actor starts.
+    provision_topology(rabbit_url)
+    rabbit = RabbitBrokerClient(url=SecretStr(rabbit_url))
+
+    registry = GnrRabbit(
+        settings=ServiceSettings(service_alias=REGISTRY_ALIAS, rabbit=rabbit),
+        authority=PostgresAuthority(session_factory=session_factory),
+    )
+    mm = MarketMakerStub(
+        settings=ServiceSettings(service_alias=KEENE, rabbit=rabbit),
+        registry_alias=REGISTRY_ALIAS,
+    )
+    registry.start()
+    mm.start()
+    try:
+        _wait_for(lambda: registry._consuming, 15, "registry is consuming")
+        _wait_for(lambda: mm._consuming, 15, "marketmaker is consuming")
+
+        # Introduce a new ConnectivityNode under keene and move the beech home
+        # beneath it — the whole beech subtree re-parents atomically.
+        new_cn = GNodeGt(
+            g_node_id=str(uuid.uuid4()),
+            alias=f"{KEENE}.sub",
+            base_class=BaseGNodeClass.ConnectivityNode,
+            g_node_class="ConnectivityNode",
+            status=GNodeStatus.Active,
+            position_point_id=DEV_POSITION.id,
+            display_name="sub",
+        )
+        cmd = GNodeReparentCmd(
+            new_node=new_cn, moved_child_g_node_ids=[beech_ltn.g_node_id]
+        )
+
+        mm.send(
+            envelope=mm.direct_envelope(
+                type_name=cmd.type_name,
+                to_class=TransportClass.GridNodeRegistry,
+                to_alias=REGISTRY_ALIAS,
+            ),
+            body=cmd.to_bytes(),
+        )
+
+        # The broadcast comes back to a real subscriber over the real broker.
+        _wait_for(lambda: len(mm.broadcasts) > 0, 15, "topology broadcast received")
+    finally:
+        mm.stop()
+        registry.stop()
+
+    # The broadcast carries the rewritten beech subtree.
+    decoded = default_codec.from_dict(json.loads(mm.broadcasts[0]))
+    assert isinstance(decoded, GNodeTopologyBroadcast)
+    broadcast_aliases = {g.alias for g in decoded.updated_nodes}
+    assert f"{KEENE}.sub" in broadcast_aliases
+    assert f"{KEENE}.sub.beech" in broadcast_aliases
+    assert f"{KEENE}.sub.beech.scada" in broadcast_aliases
+    assert f"{KEENE}.sub.beech.ta" in broadcast_aliases
+
+    # The DB reflects the rewrite: ids stable, aliases moved, old freed.
+    auth = PostgresAuthority(session_factory=session_factory)
+    assert auth.get_by_alias(BEECH_LTN) is None
+    moved = auth.get_by_alias(f"{KEENE}.sub.beech")
+    assert moved is not None and moved.g_node_id == beech_ltn.g_node_id
+    assert auth.get_by_alias(f"{KEENE}.sub.beech.scada") is not None
+    assert auth.get_by_alias(f"{KEENE}.sub.beech.ta") is not None

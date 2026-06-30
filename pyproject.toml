@@ -23,7 +23,7 @@ gnr = "gnr:main"
 [dependency-groups]
 dev = [
     "pytest>=8.0",
-    "testcontainers[postgres]>=4.0",
+    "testcontainers[postgres,rabbitmq]>=4.0",
 ]
 
 [tool.pytest.ini_options]
