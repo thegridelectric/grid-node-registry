@@ -106,7 +106,7 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.17.2" },
     { name = "fastapi", specifier = ">=0.123.0" },
-    { name = "gridworks-base", editable = "../gridworks-base" },
+    { name = "gridworks-base", specifier = ">=0.5.3" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.1" },
     { name = "pydantic-settings", specifier = ">=2.12.0" },
     { name = "sqlalchemy", specifier = ">=2.0.44" },
@@ -137,8 +137,8 @@ wheels = [
 
 [[package]]
 name = "gridworks-base"
-version = "0.5.2"
-source = { editable = "../gridworks-base" }
+version = "0.5.3"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pika" },
     { name = "pydantic" },
@@ -146,34 +146,9 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "xdg" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "pika", specifier = ">=1.3.2" },
-    { name = "pydantic", specifier = ">=2.8.2" },
-    { name = "pydantic-settings", specifier = ">=2.3.4" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "xdg", specifier = ">=6.0.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "coverage", extras = ["toml"], specifier = ">=6.2" },
-    { name = "furo", specifier = ">=2021.11.12" },
-    { name = "mypy", specifier = ">=0.930" },
-    { name = "myst-parser", specifier = ">=0.16.1" },
-    { name = "pep8-naming", specifier = ">=0.12.1" },
-    { name = "pika-stubs", specifier = ">=0.1.3" },
-    { name = "pre-commit", specifier = ">=2.16.0" },
-    { name = "pre-commit-hooks", specifier = ">=4.1.0" },
-    { name = "pygments", specifier = ">=2.10.0" },
-    { name = "pytest", specifier = ">=6.2.5" },
-    { name = "pyupgrade", specifier = ">=2.29.1" },
-    { name = "ruff", specifier = ">=0.5.6" },
-    { name = "sphinx", specifier = ">=4.3.2" },
-    { name = "sphinx-autobuild", specifier = ">=2021.3.14" },
-    { name = "sphinx-click", specifier = ">=3.0.2" },
-    { name = "xdoctest", extras = ["colors"], specifier = ">=0.15.10" },
+sdist = { url = "https://files.pythonhosted.org/packages/e1/f1/31b383bbc2b5c620f666001a9216b99300a3d303474b98bfd448342d7d0d/gridworks_base-0.5.3.tar.gz", hash = "sha256:2c4aac428e48db5681d234a6da59842bbda06a1ae4f21d30cab4749ec3390cbe", size = 130955, upload-time = "2026-06-30T22:48:56.754Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5d/25/a34292b402b9be4f2bf42a29f40906d76d61fdab161a8246fbfedb8521f2/gridworks_base-0.5.3-py3-none-any.whl", hash = "sha256:6192db6748869e6064d32d02c909c448a690715ac9c2b8ec305dbabeeb01a74e", size = 72624, upload-time = "2026-06-30T22:48:55.805Z" },
 ]
 
 [[package]]
