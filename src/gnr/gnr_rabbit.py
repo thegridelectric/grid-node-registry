@@ -7,9 +7,8 @@ and holds **no** registry logic of its own. The registry is a gwbase
 enum, since transport routing is decoupled from message decoding.
 
 First cut handles the write loop: consume a `g.node.reparent.cmd`, apply it, and
-broadcast the resulting `g.node.topology.broadcast`. (The read request/reply
-surface — `assert_active`, `get` — needs its own Sema request types and lands
-next.)
+broadcast the resulting `g.node.forest` (the affected subtree). (The read
+request/reply surface — `g.node.forest.request` → `g.node.forest` — lands next.)
 """
 
 from __future__ import annotations
@@ -22,7 +21,7 @@ from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 from gnr.db.authority import AuthoritySource, PostgresAuthority
 from gnr.sema.codec import default_codec
 from gnr.sema.property_format import LeftRightDot
-from gnr.sema.types import GNodeTopologyBroadcast
+from gnr.sema.types import GNodeForest
 
 REPARENT_CMD = "g.node.reparent.cmd"
 
@@ -52,8 +51,8 @@ class GnrRabbit(Orchestrator):
             broadcast = self.authority.apply_reparent(cmd)
             self.broadcast_topology(broadcast)
 
-    def broadcast_topology(self, broadcast: GNodeTopologyBroadcast) -> None:
-        """Publish a topology change on the registry's mic exchange (best-effort)."""
+    def broadcast_topology(self, broadcast: GNodeForest) -> None:
+        """Publish the affected forest on the registry's mic exchange (best-effort)."""
         self.send(
             envelope=self.broadcast_envelope(type_name=broadcast.type_name),
             body=json.dumps(broadcast.to_dict()).encode(),

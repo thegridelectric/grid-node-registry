@@ -3,7 +3,8 @@ enums:
   g.node.status: g.node.status
 types:
   connectivity.edge.gt: connectivity.edge.gt
+  g.node.forest: g.node.forest
+  g.node.forest.request: g.node.forest.request
   g.node.gt: g.node.gt
   g.node.reparent.cmd: g.node.reparent.cmd
-  g.node.topology.broadcast: g.node.topology.broadcast
   position.point.gt: position.point.gt

@@ -79,7 +79,7 @@ def test_reparent_rewrites_subtree(seeded, session_factory):
     broadcast = auth.apply_reparent(cmd)
 
     # The broadcast carries the new node + the rewritten beech subtree.
-    broadcast_aliases = {g.alias for g in broadcast.updated_nodes}
+    broadcast_aliases = {g.alias for g in broadcast.nodes}
     assert f"{KEENE}.sub" in broadcast_aliases
     assert f"{KEENE}.sub.beech" in broadcast_aliases
     assert f"{KEENE}.sub.beech.scada" in broadcast_aliases

@@ -1,11 +1,11 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
-$id: "https://schemas.electricity.works/types/g.node.gt/004"
+$id: "https://schemas.electricity.works/types/g.node.gt/005"
 
 title: "g.node.gt"
 type: object
 description: >
-  A GNode (“Grid Node”) is the fundamental identity object in the GridWorks 
-  ecosystem. Every physical location, metered unit, device, service, or actor 
+  A GNode (“Grid Node”) is the fundamental identity object in the GridWorks
+  ecosystem. Every physical location, metered unit, device, service, or actor
   interacting with the transactive system is represented as a GNode.
 
 properties:
@@ -36,7 +36,7 @@ properties:
     description: >
       Functional or role-based classification for the GNode. Interpreted
       according to the namespace of the registering organization. This field is a
-      free-form string, not a universal enum. 
+      free-form string, not a universal enum.
 
   Status:
     $ref: "https://schemas.electricity.works/enums/g.node.status/000"
@@ -65,7 +65,7 @@ properties:
     const: "g.node.gt"
 
   Version:
-    const: "004"
+    const: "005"
 
 required:
   - GNodeId
@@ -89,7 +89,7 @@ examples:
       "PositionPointId": "198ca6af-5a4b-43a2-a8a9-7546deabc731",
       "DisplayName": "Beech Street Meter",
       "TypeName": "g.node.gt",
-      "Version": "004"
+      "Version": "005"
     }
   - |
     {
@@ -100,7 +100,7 @@ examples:
       "Status": "Active",
       "DisplayName": "New England Weather Forecast Service",
       "TypeName": "g.node.gt",
-      "Version": "004"
+      "Version": "005"
     }
 
 x-gridworks:
@@ -134,6 +134,12 @@ x-gridworks:
       statement: >
         a. Alias SHALL end with ".ta" if and only if GNodeClass is "TerminalAsset".
         b. Alias SHALL end with ".scada" if and only if GNodeClass is "Scada".
+
+    - number: 6
+      name: "GNodeAliasHasBody"
+      statement: >
+        a. Alias SHALL have at least two dotted words (the universe segment is a namespace, not a GNodeAlias, so the shortest valid GNodeAlias is like "d1.isone").
+        b. If PrevAlias is present, it SHALL likewise have at least two dotted words.
 
   extended_description: >
     Grid Nodes (GNodes) provide the stable identity layer for distributed

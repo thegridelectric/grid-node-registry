@@ -30,14 +30,14 @@ from gnr.dev_universe import DEV_POSITION, seed_dev_universe
 from gnr.gnr_rabbit import GnrRabbit
 from gnr.sema.codec import default_codec
 from gnr.sema.enums import BaseGNodeClass, GNodeStatus
-from gnr.sema.types import GNodeGt, GNodeReparentCmd, GNodeTopologyBroadcast
+from gnr.sema.types import GNodeForest, GNodeGt, GNodeReparentCmd
 
 pytestmark = pytest.mark.integration
 
 REGISTRY_ALIAS = "d1.registry"
 KEENE = "d1.isone.me.versant.keene"  # a MarketMaker — authority over the beech subtree
 BEECH_LTN = f"{KEENE}.beech"
-TOPOLOGY_BROADCAST = "g.node.topology.broadcast"
+TOPOLOGY_BROADCAST = "g.node.forest"
 
 
 def provision_topology(url: str) -> None:
@@ -156,8 +156,8 @@ def test_reparent_over_real_broker(session_factory, rabbit_url):
 
     # The broadcast carries the rewritten beech subtree.
     decoded = default_codec.from_dict(json.loads(mm.broadcasts[0]))
-    assert isinstance(decoded, GNodeTopologyBroadcast)
-    broadcast_aliases = {g.alias for g in decoded.updated_nodes}
+    assert isinstance(decoded, GNodeForest)
+    broadcast_aliases = {g.alias for g in decoded.nodes}
     assert f"{KEENE}.sub" in broadcast_aliases
     assert f"{KEENE}.sub.beech" in broadcast_aliases
     assert f"{KEENE}.sub.beech.scada" in broadcast_aliases

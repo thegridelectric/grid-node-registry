@@ -24,9 +24,9 @@ from gnr.sema.enums import GNodeStatus
 from gnr.sema.property_format import LeftRightDot, UUID4Str
 from gnr.sema.types import (
     ConnectivityEdgeGt,
+    GNodeForest,
     GNodeGt,
     GNodeReparentCmd,
-    GNodeTopologyBroadcast,
 )
 
 
@@ -91,7 +91,7 @@ class AuthoritySource(ABC):
     def fetch_edges(self, g_node_id: UUID4Str) -> EdgeView: ...
 
     @abstractmethod
-    def apply_reparent(self, cmd: GNodeReparentCmd) -> GNodeTopologyBroadcast: ...
+    def apply_reparent(self, cmd: GNodeReparentCmd) -> GNodeForest: ...
 
 
 class PostgresAuthority(AuthoritySource):
@@ -137,13 +137,14 @@ class PostgresAuthority(AuthoritySource):
 
     # ---- the mutation ------------------------------------------------------
 
-    def apply_reparent(self, cmd: GNodeReparentCmd) -> GNodeTopologyBroadcast:
+    def apply_reparent(self, cmd: GNodeReparentCmd) -> GNodeForest:
         """Introduce node N and re-parent the named children beneath it.
 
         The whole operation — insert N, recursively rewrite each moved child's
         subtree aliases, retire/create the structural edges, claim every new
         alias, and validate the result — commits in ONE transaction. Returns the
-        topology broadcast (the affected subtree with new aliases).
+        affected **forest** (rooted at N): its updated GNodes (new aliases) + the
+        structural edges created (E→N and N→each moved child).
         """
         n = cmd.new_node
         with self._session_factory() as s:
@@ -159,10 +160,13 @@ class PostgresAuthority(AuthoritySource):
             s.flush()
 
             updated: dict[str, GNodeSql] = {n.g_node_id: s.get(GNodeSql, n.g_node_id)}
-            s.add(ConnectivityEdgeSql(
+            created_edges: list[ConnectivityEdgeSql] = []
+            edge_e_to_n = ConnectivityEdgeSql(
                 id=str(uuid.uuid4()), from_g_node_id=e.id,
                 to_g_node_id=n.g_node_id, status=GNodeStatus.Active,
-            ))
+            )
+            s.add(edge_e_to_n)
+            created_edges.append(edge_e_to_n)
 
             for child_id in cmd.moved_child_g_node_ids:
                 child = s.get(GNodeSql, child_id)
@@ -180,17 +184,21 @@ class PostgresAuthority(AuthoritySource):
                 )
                 if old_edge is not None:
                     old_edge.status = GNodeStatus.PermanentlyDeactivated  # retire, keep for history
-                s.add(ConnectivityEdgeSql(
+                edge_n_to_child = ConnectivityEdgeSql(
                     id=str(uuid.uuid4()), from_g_node_id=n.g_node_id,
                     to_g_node_id=child_id, status=GNodeStatus.Active,
-                ))
+                )
+                s.add(edge_n_to_child)
+                created_edges.append(edge_n_to_child)
 
             violations = validate_registry(s)
             if violations:
                 raise ReparentError(f"re-parent would violate invariants: {violations}")
 
-            broadcast = GNodeTopologyBroadcast(
-                updated_nodes=[row.to_gt() for row in updated.values()]
+            broadcast = GNodeForest(
+                roots=[n.alias],
+                nodes=[row.to_gt() for row in updated.values()],
+                edges=[edge.to_gt() for edge in created_edges],
             )
             s.commit()
         return broadcast
