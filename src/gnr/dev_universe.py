@@ -12,7 +12,6 @@ GNode carries a fresh GNodeId — a simulation of the fleet, not the production 
 from __future__ import annotations
 
 import hashlib
-import uuid
 
 from gnr.db.alias_ledger import claim_alias
 from gnr.db.models import (
@@ -22,8 +21,9 @@ from gnr.db.models import (
     PositionPointSql,
 )
 from gnr.db.validate import is_forest_root, parent_alias
+from gnr.ids import deterministic_uuid4, edge_id
 from gnr.sema.enums import BaseGNodeClass as B, GNodeStatus as S
-from gnr.sema.property_format import LeftRightDot, UUID4Str
+from gnr.sema.property_format import LeftRightDot
 from gnr.sema.types import GNodeGt, PositionPointGt
 
 DEV_UNIVERSE = "d1"
@@ -66,15 +66,10 @@ def _dev_universe_specs() -> dict[LeftRightDot, tuple[B, str]]:
 _ATLANTIS_LAT_UDEG = 32_000_000
 _ATLANTIS_LON_UDEG = -40_000_000
 
-
-def _det_uuid4(seed: str) -> UUID4Str:
-    """A deterministic string in uuid4 *format* (version/variant bits set) from a
-    seed. `PositionPointGt.id` requires the uuid4 format; a uuid5 fails it. This
-    keeps ids reproducible across seeds (the determinism-readiness principle)."""
-    b = bytearray(hashlib.sha256(seed.encode()).digest()[:16])
-    b[6] = (b[6] & 0x0F) | 0x40  # version 4
-    b[8] = (b[8] & 0x3F) | 0x80  # variant RFC 4122
-    return str(uuid.UUID(bytes=bytes(b)))
+# Hash domain-separation tags for deterministic dev ids — internal salts, NOT Sema
+# names (see gnr.ids). Slash-delimited so they can't be read as a left.right.dot.
+_POS_ID_DOMAIN = "gnr-det-id/dev-universe-position"
+_GNODE_ID_DOMAIN = "gnr-det-id/dev-universe-gnode"
 
 
 def dev_position_for(alias: LeftRightDot) -> PositionPointGt:
@@ -88,7 +83,7 @@ def dev_position_for(alias: LeftRightDot) -> PositionPointGt:
     lat = _ATLANTIS_LAT_UDEG + int.from_bytes(h[16:20], "big") % 1_600_000  # ≤ +1.6°
     lon = _ATLANTIS_LON_UDEG + int.from_bytes(h[20:24], "big") % 1_600_000  # ≤ +1.6°
     return PositionPointGt(
-        id=_det_uuid4("gnr.dev-universe.position:" + alias),
+        id=deterministic_uuid4(f"{_POS_ID_DOMAIN}/{alias}"),
         latitude_micro_deg=lat,
         longitude_micro_deg=lon,
     )
@@ -105,7 +100,7 @@ def build_dev_universe() -> list[GNodeGt]:
     for alias, (base_class, g_node_class) in _dev_universe_specs().items():
         physical = base_class != B.Logical
         gnodes.append(GNodeGt(
-            g_node_id=str(uuid.uuid4()),
+            g_node_id=deterministic_uuid4(f"{_GNODE_ID_DOMAIN}/{alias}"),
             alias=alias,
             base_class=base_class,
             g_node_class=g_node_class,
@@ -154,7 +149,7 @@ def seed_dev_universe(session, reset: bool = True) -> list[GNodeGt]:
             continue
         parent = by_alias[parent_alias(g.alias)]
         session.add(ConnectivityEdgeSql(
-            id=str(uuid.uuid4()),
+            id=edge_id(parent.g_node_id, g.g_node_id),
             from_g_node_id=parent.g_node_id,
             to_g_node_id=g.g_node_id,
             status=S.Active,

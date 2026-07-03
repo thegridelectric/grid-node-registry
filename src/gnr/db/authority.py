@@ -10,16 +10,15 @@ Postgres today, a distributed/on-chain record behind the same surface tomorrow).
 
 from __future__ import annotations
 
-import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
 
-from collections.abc import Iterable
-
 from gnr.db.alias_ledger import claim_alias
-from gnr.db.models import ConnectivityEdgeSql, GNodeSql
+from gnr.db.models import CommandLogSql, ConnectivityEdgeSql, GNodeSql
 from gnr.db.session import SessionLocal
 from gnr.db.validate import is_forest_root, parent_alias, validate_registry
+from gnr.ids import command_hash, edge_id
 from gnr.sema.enums import GNodeStatus
 from gnr.sema.property_format import LeftRightDot, UUID4Str
 from gnr.sema.types import (
@@ -147,7 +146,13 @@ class PostgresAuthority(AuthoritySource):
         structural edges created (E→N and N→each moved child).
         """
         n = cmd.new_node
+        payload = cmd.to_bytes()
+        chash = command_hash(payload)
         with self._session_factory() as s:
+            # Replay-safety: a command already in the log was already applied (its
+            # effects are the current state); re-applying would double-insert N.
+            if s.get(CommandLogSql, chash) is not None:
+                raise ReparentError(f"command {chash[:12]}… already applied")
             if is_forest_root(n.alias):
                 raise ReparentError(f"new node {n.alias!r} is a forest root; nothing to re-parent under")
             e_alias = parent_alias(n.alias)
@@ -159,10 +164,13 @@ class PostgresAuthority(AuthoritySource):
             claim_alias(s, n.alias, n.g_node_id)
             s.flush()
 
+            # Edge ids are DERIVED from their endpoints (not random) so a replicated
+            # backend re-executing this command computes the same ids — the ids
+            # serialize into the g.node.forest, i.e. authoritative state.
             updated: dict[str, GNodeSql] = {n.g_node_id: s.get(GNodeSql, n.g_node_id)}
             created_edges: list[ConnectivityEdgeSql] = []
             edge_e_to_n = ConnectivityEdgeSql(
-                id=str(uuid.uuid4()), from_g_node_id=e.id,
+                id=edge_id(e.id, n.g_node_id), from_g_node_id=e.id,
                 to_g_node_id=n.g_node_id, status=GNodeStatus.Active,
             )
             s.add(edge_e_to_n)
@@ -185,7 +193,7 @@ class PostgresAuthority(AuthoritySource):
                 if old_edge is not None:
                     old_edge.status = GNodeStatus.PermanentlyDeactivated  # retire, keep for history
                 edge_n_to_child = ConnectivityEdgeSql(
-                    id=str(uuid.uuid4()), from_g_node_id=n.g_node_id,
+                    id=edge_id(n.g_node_id, child_id), from_g_node_id=n.g_node_id,
                     to_g_node_id=child_id, status=GNodeStatus.Active,
                 )
                 s.add(edge_n_to_child)
@@ -200,6 +208,9 @@ class PostgresAuthority(AuthoritySource):
                 nodes=[row.to_gt() for row in updated.values()],
                 edges=[edge.to_gt() for edge in created_edges],
             )
+            # Append the applied command to the log (the primitive; state is a
+            # projection). Same transaction as the state change.
+            s.add(CommandLogSql(command_hash=chash, type_name=cmd.type_name, payload=payload.decode()))
             s.commit()
         return broadcast
 

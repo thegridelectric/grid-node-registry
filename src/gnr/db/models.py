@@ -208,3 +208,34 @@ class AliasAssignmentSql(Base):
     first_assigned_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False
     )
+
+
+# ============================================================
+#  COMMAND LOG  (append-only; the chain-ready primitive)
+# ============================================================
+
+class CommandLogSql(Base):
+    """Append-only log of applied mutation commands — the source-of-truth primitive.
+
+    A ledger/chain is fundamentally an ordered log of signed commands with state
+    derived from it. Every mutation (a re-parent; later a create) is appended here
+    in the SAME transaction as the state change, keyed by a **content hash** of the
+    command's canonical serialization (`gnr.ids.command_hash`). That gives:
+      - **content-addressing** — the id IS the hash of the command bytes;
+      - **replay-safety / idempotency** — a command whose hash is already present
+        was already applied, so the PK rejects a re-apply;
+      - the foundation for moving authority off single-writer Postgres later (the
+        log moves to the chain; `g_nodes`/edges/`alias_assignment` become a
+        projection of it).
+    `applied_at` is local audit metadata, not authoritative state. See executor
+    "Distributed-readiness".
+    """
+
+    __tablename__ = "command_log"
+
+    command_hash: Mapped[str] = mapped_column(String, primary_key=True)
+    type_name: Mapped[str] = mapped_column(String, nullable=False)
+    payload: Mapped[str] = mapped_column(String, nullable=False)  # canonical Sema JSON
+    applied_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+    )

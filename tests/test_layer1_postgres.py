@@ -13,10 +13,11 @@ import uuid
 
 import pytest
 
-from gnr.db.authority import PostgresAuthority
-from gnr.db.models import AliasAssignmentSql, ConnectivityEdgeSql, GNodeSql
+from gnr.db.authority import PostgresAuthority, ReparentError
+from gnr.db.models import AliasAssignmentSql, CommandLogSql, ConnectivityEdgeSql, GNodeSql
 from gnr.db.validate import validate_registry
 from gnr.dev_universe import DEV_POSITION, seed_dev_universe
+from gnr.ids import command_hash, edge_id
 from gnr.sema.enums import BaseGNodeClass, GNodeStatus
 from gnr.sema.types import GNodeGt, GNodeReparentCmd
 
@@ -24,6 +25,19 @@ pytestmark = pytest.mark.integration
 
 KEENE = "d1.isone.me.versant.keene"
 BEECH_LTN = f"{KEENE}.beech"
+
+
+def _new_cn():
+    """A fresh ConnectivityNode to introduce under keene (alias `keene.sub`)."""
+    return GNodeGt(
+        g_node_id=str(uuid.uuid4()),
+        alias=f"{KEENE}.sub",
+        base_class=BaseGNodeClass.ConnectivityNode,
+        g_node_class="ConnectivityNode",
+        status=GNodeStatus.Active,
+        position_point_id=DEV_POSITION.id,
+        display_name="sub",
+    )
 
 
 @pytest.fixture
@@ -178,3 +192,38 @@ def test_reparent_self_collision_aborts(seeded, session_factory):
     with session_factory() as s:
         owner = s.get(AliasAssignmentSql, colliding_alias)
         assert owner.g_node_id == squatter_id
+
+
+def test_reparent_edges_deterministic_and_command_logged(seeded, session_factory):
+    """Distributed-readiness #1/#2: edge ids are derived (not random) and the
+    applied command is appended to the content-addressed command log."""
+    auth = PostgresAuthority(session_factory=session_factory)
+    keene = seeded[KEENE]
+    beech_ltn = seeded[BEECH_LTN]
+    new_cn = _new_cn()
+    cmd = GNodeReparentCmd(new_node=new_cn, moved_child_g_node_ids=[beech_ltn.g_node_id])
+
+    forest = auth.apply_reparent(cmd)
+
+    # Edge ids in the forest are exactly edge_id(from, to) — reproducible on any
+    # validator (#1), not random uuids.
+    forest_edge_ids = {e.id for e in forest.edges}
+    assert edge_id(keene.g_node_id, new_cn.g_node_id) in forest_edge_ids
+    assert edge_id(new_cn.g_node_id, beech_ltn.g_node_id) in forest_edge_ids
+
+    # The command is appended to the log, content-addressed (#2).
+    with session_factory() as s:
+        row = s.get(CommandLogSql, command_hash(cmd.to_bytes()))
+        assert row is not None and row.type_name == "g.node.reparent.cmd"
+
+
+def test_reparent_replay_rejected(seeded, session_factory):
+    """Distributed-readiness #2: re-applying an identical command is rejected —
+    its content hash is already in the command log (replay-safety)."""
+    auth = PostgresAuthority(session_factory=session_factory)
+    beech_ltn = seeded[BEECH_LTN]
+    cmd = GNodeReparentCmd(new_node=_new_cn(), moved_child_g_node_ids=[beech_ltn.g_node_id])
+
+    auth.apply_reparent(cmd)
+    with pytest.raises(ReparentError):
+        auth.apply_reparent(cmd)
