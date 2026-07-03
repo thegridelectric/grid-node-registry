@@ -14,11 +14,14 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+from collections.abc import Iterable
+
 from gnr.db.alias_ledger import claim_alias
 from gnr.db.models import ConnectivityEdgeSql, GNodeSql
 from gnr.db.session import SessionLocal
-from gnr.db.validate import parent_alias, validate_registry
+from gnr.db.validate import is_forest_root, parent_alias, validate_registry
 from gnr.sema.enums import GNodeStatus
+from gnr.sema.property_format import LeftRightDot, UUID4Str
 from gnr.sema.types import (
     ConnectivityEdgeGt,
     GNodeGt,
@@ -41,22 +44,24 @@ class EdgeView:
 
 # ---- pure alias-rewrite logic (no DB — unit-testable) ----------------------
 
-def in_subtree(alias: str, prefix: str) -> bool:
+def in_subtree(alias: LeftRightDot, prefix: LeftRightDot) -> bool:
     """True if `alias` is `prefix` itself or a descendant of it (materialized path)."""
     return alias == prefix or alias.startswith(prefix + ".")
 
 
-def rewrite_alias(alias: str, old_prefix: str, new_prefix: str) -> str:
+def rewrite_alias(alias: LeftRightDot, old_prefix: LeftRightDot, new_prefix: LeftRightDot) -> LeftRightDot:
     """Rewrite one materialized-path alias from `old_prefix` to `new_prefix`."""
     return new_prefix + alias[len(old_prefix):]
 
 
-def moved_child_new_prefix(new_node_alias: str, child_alias: str) -> str:
+def moved_child_new_prefix(new_node_alias: LeftRightDot, child_alias: LeftRightDot) -> LeftRightDot:
     """The alias-prefix a moved child takes under the new node N (N.alias + child's last word)."""
     return f"{new_node_alias}.{child_alias.rsplit('.', 1)[-1]}"
 
 
-def subtree_rewrite_map(aliases, old_prefix: str, new_prefix: str) -> dict[str, str]:
+def subtree_rewrite_map(
+    aliases: Iterable[LeftRightDot], old_prefix: LeftRightDot, new_prefix: LeftRightDot
+) -> dict[LeftRightDot, LeftRightDot]:
     """Map every alias in the subtree rooted at `old_prefix` to its rewritten alias.
 
     The pure core of the recursive re-parent rewrite: a subtree is a set of
@@ -73,17 +78,17 @@ class AuthoritySource(ABC):
     """The registry's read + mutate surface. Postgres is one implementation."""
 
     @abstractmethod
-    def get_by_id(self, g_node_id: str) -> GNodeGt | None: ...
+    def get_by_id(self, g_node_id: UUID4Str) -> GNodeGt | None: ...
 
     @abstractmethod
-    def get_by_alias(self, alias: str) -> GNodeGt | None: ...
+    def get_by_alias(self, alias: LeftRightDot) -> GNodeGt | None: ...
 
     @abstractmethod
-    def assert_active(self, g_node_id: str) -> bool:
+    def assert_active(self, g_node_id: UUID4Str) -> bool:
         """True iff a GNode with this id exists and is Active — FIS's hot-path check."""
 
     @abstractmethod
-    def fetch_edges(self, g_node_id: str) -> EdgeView: ...
+    def fetch_edges(self, g_node_id: UUID4Str) -> EdgeView: ...
 
     @abstractmethod
     def apply_reparent(self, cmd: GNodeReparentCmd) -> GNodeTopologyBroadcast: ...
@@ -97,22 +102,22 @@ class PostgresAuthority(AuthoritySource):
 
     # ---- reads -------------------------------------------------------------
 
-    def get_by_id(self, g_node_id: str) -> GNodeGt | None:
+    def get_by_id(self, g_node_id: UUID4Str) -> GNodeGt | None:
         with self._session_factory() as s:
             row = s.get(GNodeSql, g_node_id)
             return row.to_gt() if row is not None else None
 
-    def get_by_alias(self, alias: str) -> GNodeGt | None:
+    def get_by_alias(self, alias: LeftRightDot) -> GNodeGt | None:
         with self._session_factory() as s:
             row = s.query(GNodeSql).filter_by(alias=alias).one_or_none()
             return row.to_gt() if row is not None else None
 
-    def assert_active(self, g_node_id: str) -> bool:
+    def assert_active(self, g_node_id: UUID4Str) -> bool:
         with self._session_factory() as s:
             row = s.get(GNodeSql, g_node_id)
             return row is not None and row.status == GNodeStatus.Active
 
-    def fetch_edges(self, g_node_id: str) -> EdgeView:
+    def fetch_edges(self, g_node_id: UUID4Str) -> EdgeView:
         with self._session_factory() as s:
             active = ConnectivityEdgeSql.status == GNodeStatus.Active
             parents = (
@@ -142,9 +147,9 @@ class PostgresAuthority(AuthoritySource):
         """
         n = cmd.new_node
         with self._session_factory() as s:
+            if is_forest_root(n.alias):
+                raise ReparentError(f"new node {n.alias!r} is a forest root; nothing to re-parent under")
             e_alias = parent_alias(n.alias)
-            if e_alias is None:
-                raise ReparentError(f"new node {n.alias!r} is a root; nothing to re-parent under")
             e = s.query(GNodeSql).filter_by(alias=e_alias).one_or_none()
             if e is None:
                 raise ReparentError(f"parent {e_alias!r} of new node {n.alias!r} not found")

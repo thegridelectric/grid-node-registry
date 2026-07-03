@@ -16,6 +16,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from gnr.db.models import AliasAssignmentSql
+from gnr.sema.property_format import LeftRightDot, UUID4Str
 
 
 class AliasAlreadyOwned(Exception):
@@ -25,7 +26,7 @@ class AliasAlreadyOwned(Exception):
     requested owner is not the one that holds it.
     """
 
-    def __init__(self, alias: str, current_owner: str, requested_owner: str) -> None:
+    def __init__(self, alias: LeftRightDot, current_owner: UUID4Str, requested_owner: UUID4Str) -> None:
         self.alias = alias
         self.current_owner = current_owner
         self.requested_owner = requested_owner
@@ -35,7 +36,7 @@ class AliasAlreadyOwned(Exception):
         )
 
 
-def claim_alias(session: Session, alias: str, g_node_id: str) -> None:
+def claim_alias(session: Session, alias: LeftRightDot, g_node_id: UUID4Str) -> None:
     """Record that `g_node_id` owns `alias`, or assert it already does.
 
     Three outcomes, race-free (the `alias` unique index serializes concurrent

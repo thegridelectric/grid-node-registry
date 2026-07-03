@@ -21,6 +21,7 @@ from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 
 from gnr.db.authority import AuthoritySource, PostgresAuthority
 from gnr.sema.codec import default_codec
+from gnr.sema.property_format import LeftRightDot
 from gnr.sema.types import GNodeTopologyBroadcast
 
 REPARENT_CMD = "g.node.reparent.cmd"
@@ -34,8 +35,8 @@ class GnrRabbit(Orchestrator):
         *,
         settings: ServiceSettings,
         authority: AuthoritySource | None = None,
-        my_super_alias: str = "d1.super1",
-        my_time_coordinator_alias: str = "d1.time",
+        my_super_alias: LeftRightDot = "d1.super1",
+        my_time_coordinator_alias: LeftRightDot = "d1.time",
     ) -> None:
         super().__init__(
             settings=settings,

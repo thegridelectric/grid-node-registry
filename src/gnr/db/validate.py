@@ -16,7 +16,7 @@ the legacy→new mapping `ConductorTopologyNode → ConnectivityNode`,
 Logical` (confirmed by the `base.g.node.class` value-descriptions). Because the
 physical classes only ever parent physical classes (a TerminalAsset sits behind
 an atomic-metered LeafTransactiveNode, which sits under a ConnectivityNode/
-MarketMaker, up to the world root), enforcing the hierarchy also gives "the
+MarketMaker, up to a copper forest root), enforcing the hierarchy also gives "the
 active physical subtree is parent-closed" as a consequence.
 """
 
@@ -27,45 +27,51 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from gnr.sema.enums import BaseGNodeClass, GNodeStatus
+from gnr.sema.property_format import LeftRightDot, UUID4Str
 from gnr.db.models import ConnectivityEdgeSql, GNodeSql
 
 
 # A **CopperNode** is the copper-topology backbone class — a ConnectivityNode or a
 # MarketMaker (a MarketMaker is a ConnectivityNode that also runs a local market).
-# The backbone is parent-closed: a CopperNode's parent is the world root or another
-# CopperNode.
+# The backbone is parent-closed: a CopperNode's parent is another CopperNode, unless
+# it is a forest root (its alias-parent is the bare universe token, not a GNode).
 COPPER_CLASSES = frozenset({BaseGNodeClass.ConnectivityNode, BaseGNodeClass.MarketMaker})
 
 
 @dataclass(frozen=True)
 class Violation:
     invariant: str
-    g_node_id: str
-    alias: str
+    g_node_id: UUID4Str
+    alias: LeftRightDot
     detail: str
 
 
-def is_root(alias: str) -> bool:
-    """A root alias is a single word (no dot) — the root of a world."""
-    return "." not in alias
+def parent_alias(alias: LeftRightDot) -> LeftRightDot:
+    """The alias-parent: `alias` with its last dotted word dropped.
 
-
-def parent_alias(alias: str) -> str | None:
-    """The alias-parent: `alias` with its last dotted word dropped, or None for a root."""
-    if is_root(alias):
-        return None
+    Every GNodeAlias has ≥2 words, so this is always defined — a forest root's
+    parent is the bare **universe token** (a namespace, not a GNode).
+    """
     return alias.rsplit(".", 1)[0]
 
 
-def check_parent_closed_active(nodes_by_alias: dict[str, GNodeSql]) -> list[Violation]:
-    """Active non-root nodes have an existing, Active alias-parent.
+def is_forest_root(alias: LeftRightDot) -> bool:
+    """True if the alias-parent is the bare universe token — a two-word alias like
+    `d1.isone`. The universe segment is a namespace, not a GNode, so a forest root
+    has no GNode parent (see executor *Universes*)."""
+    return alias.count(".") == 1
 
-    The active GNode tree is parent-closed: no active node dangles under a
-    missing, suspended, or deactivated parent.
+
+def check_parent_closed_active(nodes_by_alias: dict[str, GNodeSql]) -> list[Violation]:
+    """Active non-forest-root nodes have an existing, Active alias-parent.
+
+    The active GNode forest is parent-closed: no active node dangles under a
+    missing, suspended, or deactivated parent. Forest roots (alias-parent is the
+    bare universe token) are the tops and are skipped.
     """
     violations: list[Violation] = []
     for node in nodes_by_alias.values():
-        if node.status != GNodeStatus.Active or is_root(node.alias):
+        if node.status != GNodeStatus.Active or is_forest_root(node.alias):
             continue
         p_alias = parent_alias(node.alias)
         parent = nodes_by_alias.get(p_alias)
@@ -85,11 +91,12 @@ def check_parent_closed_active(nodes_by_alias: dict[str, GNodeSql]) -> list[Viol
 def check_edge_coverage(
     nodes_by_alias: dict[str, GNodeSql], active_edges: list[ConnectivityEdgeSql]
 ) -> list[Violation]:
-    """Every active non-root node has exactly one active edge, from its parent.
+    """Every active non-forest-root node has exactly one active edge, from its parent.
 
     For node `A` with alias-parent `P`, the registry holds exactly one active
     `ConnectivityEdge(from=P.id, to=A.id)` — no missing edge, no extra incoming
-    edge, and the one edge comes from the alias-parent (not some other node).
+    edge, and the one edge comes from the alias-parent (not some other node). A
+    forest root has no GNode parent, hence no incoming edge, and is skipped.
     """
     incoming: dict[str, list[str]] = {}
     for edge in active_edges:
@@ -97,7 +104,7 @@ def check_edge_coverage(
 
     violations: list[Violation] = []
     for node in nodes_by_alias.values():
-        if node.status != GNodeStatus.Active or is_root(node.alias):
+        if node.status != GNodeStatus.Active or is_forest_root(node.alias):
             continue
         froms = incoming.get(node.id, [])
         if len(froms) != 1:
@@ -120,8 +127,10 @@ def check_class_hierarchy(nodes_by_alias: dict[str, GNodeSql]) -> list[Violation
     """Each non-root node's parent class is legal for its own class.
 
     The new-class form of legacy Creation Axiom 5 (ROLE):
-      - ConnectivityNode / MarketMaker → parent is the world root, or a
-        ConnectivityNode / MarketMaker;
+      - a **forest root** (alias-parent is the bare universe token) → only a
+        CopperNode or a non-Scada Logical node may sit at a forest top;
+      - ConnectivityNode / MarketMaker → parent is a ConnectivityNode / MarketMaker
+        (or it is a forest root, handled above);
       - LeafTransactiveNode → parent is a ConnectivityNode / MarketMaker;
       - TerminalAsset → parent is a LeafTransactiveNode (it sits behind an
         atomic-metered point);
@@ -137,7 +146,17 @@ def check_class_hierarchy(nodes_by_alias: dict[str, GNodeSql]) -> list[Violation
     """
     violations: list[Violation] = []
     for node in nodes_by_alias.values():
-        if is_root(node.alias):
+        if is_forest_root(node.alias):
+            # No GNode parent — only a CopperNode or a non-Scada Logical node may
+            # sit at a forest top (LTN/TA/Scada each require a specific parent).
+            ok = node.base_class in COPPER_CLASSES or (
+                node.base_class == BaseGNodeClass.Logical and node.g_node_class != "Scada"
+            )
+            if not ok:
+                violations.append(Violation(
+                    "class_hierarchy", node.id, node.alias,
+                    f"a {node.g_node_class} cannot be a forest root; it requires a parent",
+                ))
             continue
         parent = nodes_by_alias.get(parent_alias(node.alias))
         if parent is None:
@@ -145,8 +164,8 @@ def check_class_hierarchy(nodes_by_alias: dict[str, GNodeSql]) -> list[Violation
         bc, pbc = node.base_class, parent.base_class
         kind = bc.value
         if bc in COPPER_CLASSES:
-            ok = is_root(parent.alias) or pbc in COPPER_CLASSES
-            allowed = "the world root or a CopperNode (ConnectivityNode/MarketMaker)"
+            ok = pbc in COPPER_CLASSES
+            allowed = "a CopperNode (ConnectivityNode/MarketMaker)"
         elif bc == BaseGNodeClass.LeafTransactiveNode:
             ok = pbc in COPPER_CLASSES
             allowed = "a CopperNode (ConnectivityNode/MarketMaker)"

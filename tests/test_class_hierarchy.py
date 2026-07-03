@@ -29,9 +29,9 @@ def test_copper_node_is_mm_and_cn():
 
 
 def test_copper_backbone_parent_closed_ok():
-    # MM/CN alternating, rooted at d1 — the dev-universe backbone
+    # MM/CN alternating from the forest root d1.isone (the universe token d1 is
+    # NOT a GNode, so d1.isone is a forest root — its alias-parent is the token).
     nodes = tree(
-        node("d1", B.Logical),
         node("d1.isone", B.MarketMaker),
         node("d1.isone.me", B.ConnectivityNode),
         node("d1.isone.me.versant", B.ConnectivityNode),
@@ -41,30 +41,42 @@ def test_copper_backbone_parent_closed_ok():
 
 
 def test_copper_node_under_non_copper_rejected():
-    bad = node("d1.a.mm", B.MarketMaker)
-    nodes = tree(node("d1.a", B.LeafTransactiveNode), bad)  # MM under an LTN
+    bad = node("d1.mm.x.mm", B.MarketMaker)
+    nodes = tree(node("d1.mm.x", B.LeafTransactiveNode), bad)  # MM under an LTN
     assert flagged(check_class_hierarchy(nodes), bad)
 
 
 def test_leaf_transactive_node_parent_must_be_copper():
     ok = node("d1.mm.ltn", B.LeafTransactiveNode)
     assert check_class_hierarchy(tree(node("d1.mm", B.MarketMaker), ok)) == []
-    bad = node("d1.ltn1.ltn2", B.LeafTransactiveNode)
-    assert flagged(check_class_hierarchy(tree(node("d1.ltn1", B.LeafTransactiveNode), bad)), bad)
+    bad = node("d1.x.ltn1.ltn2", B.LeafTransactiveNode)
+    assert flagged(check_class_hierarchy(tree(node("d1.x.ltn1", B.LeafTransactiveNode), bad)), bad)
 
 
 def test_terminalasset_parent_must_be_ltn():
-    ok = node("d1.ltn.ta", B.TerminalAsset)
-    assert check_class_hierarchy(tree(node("d1.ltn", B.LeafTransactiveNode), ok)) == []
-    bad = node("d1.cn.ta", B.TerminalAsset)
-    assert flagged(check_class_hierarchy(tree(node("d1.cn", B.ConnectivityNode), bad)), bad)
+    ok = node("d1.mm.ltn.ta", B.TerminalAsset)
+    assert check_class_hierarchy(tree(node("d1.mm.ltn", B.LeafTransactiveNode), ok)) == []
+    bad = node("d1.mm.cn.ta", B.TerminalAsset)
+    assert flagged(check_class_hierarchy(tree(node("d1.mm.cn", B.ConnectivityNode), bad)), bad)
 
 
 def test_scada_parent_must_be_ltn():
-    ok = node("d1.ltn.scada", B.Logical, "Scada")
-    assert check_class_hierarchy(tree(node("d1.ltn", B.LeafTransactiveNode), ok)) == []
-    bad = node("d1.mm.scada", B.Logical, "Scada")
-    assert flagged(check_class_hierarchy(tree(node("d1.mm", B.MarketMaker), bad)), bad)
+    ok = node("d1.mm.ltn.scada", B.Logical, "Scada")
+    assert check_class_hierarchy(tree(node("d1.mm.ltn", B.LeafTransactiveNode), ok)) == []
+    bad = node("d1.mm.x.scada", B.Logical, "Scada")
+    assert flagged(check_class_hierarchy(tree(node("d1.mm.x", B.MarketMaker), bad)), bad)
+
+
+def test_leaf_or_ta_cannot_be_a_forest_root():
+    # A forest root (two-word alias) may only be a CopperNode or a non-Scada
+    # Logical node; classes that require a specific parent cannot sit at a top.
+    for bad in (node("d1.ltn", B.LeafTransactiveNode),
+                node("d1.ta", B.TerminalAsset),
+                node("d1.scada", B.Logical, "Scada")):
+        assert flagged(check_class_hierarchy(tree(bad)), bad)
+    for ok in (node("d1.mm", B.MarketMaker),
+               node("d1.time", B.Logical, "TimeCoordinator")):
+        assert check_class_hierarchy(tree(ok)) == []
 
 
 def test_other_logical_is_unconstrained():

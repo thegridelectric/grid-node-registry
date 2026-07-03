@@ -36,6 +36,13 @@ so the registry (and the services around it) can be exercised end-to-end against
 real broker and database without touching real money. The test harness is built as
 such a dev universe.
 
+**The universe segment is a namespace, not a GNode.** `d1` (the bare universe token)
+is **not** a GNodeAlias — it is the namespace the registry is scoped to. So every
+GNodeAlias has **at least two words**, and the registry holds a **forest of copper
+subtrees** rather than one rooted tree: the forest roots are the top-level copper
+nodes (a top-level `MarketMaker` like `d1.isone`, whose alias-parent is the bare
+token). A GNode is a *forest root* iff its alias-parent is the universe token.
+
 ## Requirements
 
 Python version requirement: 3.12.x

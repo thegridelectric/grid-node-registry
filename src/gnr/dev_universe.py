@@ -1,19 +1,18 @@
-"""Seed a dev universe (`d1.*`) that mirrors the deployed fleet + its parent GNodes.
+"""Seed a dev universe (`d1.*`) — a `validate_registry`-clean forest for harness/dev.
 
-Reads the deployed home layouts from the sibling `tlayouts/output`, re-aliases the
-universe `hw1 → d1`, and — with the copper-backbone parent chain — seeds the
-registry so it validates clean. The dev universe carries **fresh GNodeIds**: it is
-a simulation of the fleet for harness/dev work, not the production nodes
-themselves, so it can run against a dev broker + database without touching real
-money. Imports no scada code — only the layout JSON + the registry's own types.
+A static, self-contained description of a dev fleet: a copper backbone, six homes
+(each an LTN + TerminalAsset + Scada), and the logical simulation services. No
+external inputs — the aliases + classes live here as a flat map, so nothing breaks
+when the layout pipeline changes elsewhere. The universe token `d1` is **not** a
+GNode (it is a namespace); the top-level copper nodes are **forest roots**. Every
+GNode carries a fresh GNodeId — a simulation of the fleet, not the production nodes
+— so it runs against a dev broker + database without touching real money.
 """
 
 from __future__ import annotations
 
-import json
-import os
+import hashlib
 import uuid
-from pathlib import Path
 
 from gnr.db.alias_ledger import claim_alias
 from gnr.db.models import (
@@ -22,73 +21,88 @@ from gnr.db.models import (
     GNodeSql,
     PositionPointSql,
 )
-from gnr.db.validate import parent_alias
+from gnr.db.validate import is_forest_root, parent_alias
 from gnr.sema.enums import BaseGNodeClass as B, GNodeStatus as S
+from gnr.sema.property_format import LeftRightDot, UUID4Str
 from gnr.sema.types import GNodeGt, PositionPointGt
 
 DEV_UNIVERSE = "d1"
-PROD_UNIVERSE = "hw1"
-
-# The copper backbone the deployed homes hang under (alias, base_class).
-PARENT_CHAIN: list[tuple[str, B]] = [
-    ("d1", B.Logical),  # universe root
-    ("d1.isone", B.MarketMaker),
-    ("d1.isone.me", B.ConnectivityNode),
-    ("d1.isone.me.versant", B.ConnectivityNode),
-    ("d1.isone.me.versant.keene", B.MarketMaker),
-]
-
-# One placeholder location shared by all physical dev nodes (axiom 2 needs a
-# PositionPoint; the harness tests topology/identity, not geography).
-DEV_POSITION = PositionPointGt(
-    id="11111111-1111-4111-8111-111111111111",
-    latitude_micro_deg=44_570_000,
-    longitude_micro_deg=-69_710_000,
-)
+KEENE = "d1.isone.me.versant.keene"
+_HOMES = ("beech", "elm", "fir", "maple", "oak", "spruce")
 
 
-def _default_tlayouts_dir() -> Path:
-    override = os.environ.get("GNR_TLAYOUTS_DIR")
-    if override:
-        return Path(override)
-    # .../GridWorks/grid-node-registry/src/gnr/dev_universe.py -> .../GridWorks/tlayouts/output
-    return Path(__file__).resolve().parents[3] / "tlayouts" / "output"
+def _dev_universe_specs() -> dict[LeftRightDot, tuple[B, str]]:
+    """The dev universe as a flat `alias -> (base_class, g_node_class)` map.
+
+    `d1.isone` and `d1.time` are **forest roots** (their alias-parent is the bare
+    universe token `d1`, which is not a GNode). Copper (`MarketMaker`/
+    `ConnectivityNode`) g_node_class equals the base_class value (axiom 1); the
+    Logical services carry their role name.
+    """
+    specs: dict[LeftRightDot, tuple[B, str]] = {
+        # copper backbone — d1.isone is a forest root
+        "d1.isone": (B.MarketMaker, "MarketMaker"),
+        "d1.isone.me": (B.ConnectivityNode, "ConnectivityNode"),
+        "d1.isone.me.versant": (B.ConnectivityNode, "ConnectivityNode"),
+        KEENE: (B.MarketMaker, "MarketMaker"),
+        # logical simulation services (used soon by simulated dev universes)
+        "d1.time": (B.Logical, "TimeCoordinator"),  # a Logical forest root
+        "d1.isone.me.weather": (B.Logical, "WeatherForecastService"),
+        "d1.isone.me.price": (B.Logical, "PriceForecastService"),
+    }
+    for home in _HOMES:
+        specs[f"{KEENE}.{home}"] = (B.LeafTransactiveNode, "LeafTransactiveNode")
+        specs[f"{KEENE}.{home}.ta"] = (B.TerminalAsset, "TerminalAsset")
+        specs[f"{KEENE}.{home}.scada"] = (B.Logical, "Scada")
+    return specs
 
 
-def _to_dev(alias: str) -> str:
-    """Re-alias a production alias into the dev universe (`hw1.… → d1.…`)."""
-    if alias.startswith(PROD_UNIVERSE + "."):
-        return DEV_UNIVERSE + "." + alias.split(".", 1)[1]
-    return alias
+# Dev physical nodes each get a DISTINCT placeholder location (real grid nodes have
+# distinct positions; a single shared point was a test smell). The points sit in the
+# open mid-Atlantic on the ridge (~32°N 40°W) — nowhere a home could be, so a dev
+# point is never mistaken for a real dwelling (somewhere to site Atlantis). The
+# registry enforces nothing about positions (see the position-point-semantics
+# exploration); distinctness here is fixture quality, not an invariant.
+_ATLANTIS_LAT_UDEG = 32_000_000
+_ATLANTIS_LON_UDEG = -40_000_000
 
 
-def _home_nodes(layout: dict) -> list[tuple[str, B, str]]:
-    """(alias, base_class, g_node_class) for a home's LTN, Scada, and TerminalAsset."""
-    scada_alias = _to_dev(layout["MyScadaGNode"]["Alias"])
-    ta_alias = _to_dev(layout["MyTerminalAssetGNode"]["Alias"])
-    ltn_block = layout.get("MyLeafTransactiveNodeGNode")
-    # `fir` has no LTN block — derive it as the Scada's parent (drop `.scada`).
-    ltn_alias = _to_dev(ltn_block["Alias"]) if ltn_block else scada_alias.rsplit(".", 1)[0]
-    return [
-        (ltn_alias, B.LeafTransactiveNode, "LeafTransactiveNode"),
-        (scada_alias, B.Logical, "Scada"),
-        (ta_alias, B.TerminalAsset, "TerminalAsset"),
-    ]
+def _det_uuid4(seed: str) -> UUID4Str:
+    """A deterministic string in uuid4 *format* (version/variant bits set) from a
+    seed. `PositionPointGt.id` requires the uuid4 format; a uuid5 fails it. This
+    keeps ids reproducible across seeds (the determinism-readiness principle)."""
+    b = bytearray(hashlib.sha256(seed.encode()).digest()[:16])
+    b[6] = (b[6] & 0x0F) | 0x40  # version 4
+    b[8] = (b[8] & 0x3F) | 0x80  # variant RFC 4122
+    return str(uuid.UUID(bytes=bytes(b)))
 
 
-def build_dev_universe(tlayouts_dir: str | Path | None = None) -> list[GNodeGt]:
-    """The dev-universe GNodes — parent chain + every uploaded home's LTN/Scada/TA."""
-    tdir = Path(tlayouts_dir) if tlayouts_dir else _default_tlayouts_dir()
-    specs: list[tuple[str, B, str]] = [(a, bc, bc.value) for (a, bc) in PARENT_CHAIN]
-    for path in sorted(tdir.glob("*.uploaded.json")):
-        specs += _home_nodes(json.loads(path.read_text()))
+def dev_position_for(alias: LeftRightDot) -> PositionPointGt:
+    """A distinct, deterministic open-ocean PositionPoint for a physical dev node.
 
+    Derived from the alias (SHA-256, not the salted built-in `hash`), so seeds
+    reproduce byte-for-byte and every node lands on its own point within a small
+    mid-Atlantic patch (all open ocean).
+    """
+    h = hashlib.sha256(alias.encode()).digest()
+    lat = _ATLANTIS_LAT_UDEG + int.from_bytes(h[16:20], "big") % 1_600_000  # ≤ +1.6°
+    lon = _ATLANTIS_LON_UDEG + int.from_bytes(h[20:24], "big") % 1_600_000  # ≤ +1.6°
+    return PositionPointGt(
+        id=_det_uuid4("gnr.dev-universe.position:" + alias),
+        latitude_micro_deg=lat,
+        longitude_micro_deg=lon,
+    )
+
+
+# A fixed canonical dev point for tests that mint ad-hoc nodes (its own Atlantis
+# point; seeded so its FK resolves).
+DEV_POSITION = dev_position_for("d1.atlantis-canonical")
+
+
+def build_dev_universe() -> list[GNodeGt]:
+    """The dev-universe GNodes — the copper backbone, six homes, and the services."""
     gnodes: list[GNodeGt] = []
-    seen: set[str] = set()
-    for alias, base_class, g_node_class in specs:
-        if alias in seen:
-            continue
-        seen.add(alias)
+    for alias, (base_class, g_node_class) in _dev_universe_specs().items():
         physical = base_class != B.Logical
         gnodes.append(GNodeGt(
             g_node_id=str(uuid.uuid4()),
@@ -96,42 +110,54 @@ def build_dev_universe(tlayouts_dir: str | Path | None = None) -> list[GNodeGt]:
             base_class=base_class,
             g_node_class=g_node_class,
             status=S.Active,
-            position_point_id=DEV_POSITION.id if physical else None,
+            position_point_id=dev_position_for(alias).id if physical else None,
             display_name=alias,
         ))
     return gnodes
 
 
-def seed_dev_universe(session, tlayouts_dir: str | Path | None = None, reset: bool = True) -> list[GNodeGt]:
+def seed_dev_universe(session, reset: bool = True) -> list[GNodeGt]:
     """Load the dev universe into `session`'s database (re-runnable; resets first).
 
-    Inserts the placeholder PositionPoint, every dev GNode, its alias-ledger claim,
-    and a covering parent→child edge for each non-root node. Commits, returns the
-    GNodes.
+    Inserts a distinct PositionPoint per physical node, every dev GNode, its
+    alias-ledger claim, and a covering parent→child edge for each non-forest-root
+    node. Commits, returns the GNodes.
     """
     if reset:
         for table in (ConnectivityEdgeSql, AliasAssignmentSql, GNodeSql, PositionPointSql):
             session.query(table).delete(synchronize_session=False)
         session.flush()
 
-    if session.get(PositionPointSql, DEV_POSITION.id) is None:
-        session.add(PositionPointSql.from_gt(DEV_POSITION))
-
-    gnodes = build_dev_universe(tlayouts_dir)
+    gnodes = build_dev_universe()
     by_alias = {g.alias: g for g in gnodes}
+
+    # A distinct PositionPoint per physical node, plus the canonical test point;
+    # inserted before the GNodes so the position_point_id FKs resolve.
+    positions = {DEV_POSITION.id: DEV_POSITION}
+    for g in gnodes:
+        if g.position_point_id is not None:
+            p = dev_position_for(g.alias)
+            positions[p.id] = p
+    for p in positions.values():
+        session.add(PositionPointSql.from_gt(p))
+    session.flush()
+
     for g in gnodes:
         session.add(GNodeSql.from_gt(g))
     session.flush()
     for g in gnodes:
         claim_alias(session, g.alias, g.g_node_id)
     for g in gnodes:
-        pa = parent_alias(g.alias)
-        if pa is not None and pa in by_alias:
-            session.add(ConnectivityEdgeSql(
-                id=str(uuid.uuid4()),
-                from_g_node_id=by_alias[pa].g_node_id,
-                to_g_node_id=g.g_node_id,
-                status=S.Active,
-            ))
+        # A forest root's alias-parent is the bare universe token (not a GNode), so
+        # it gets no incoming edge; every other node gets one from its parent.
+        if is_forest_root(g.alias):
+            continue
+        parent = by_alias[parent_alias(g.alias)]
+        session.add(ConnectivityEdgeSql(
+            id=str(uuid.uuid4()),
+            from_g_node_id=parent.g_node_id,
+            to_g_node_id=g.g_node_id,
+            status=S.Active,
+        ))
     session.commit()
     return gnodes
