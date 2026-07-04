@@ -23,9 +23,19 @@ return codec.encode(gt)
 ## Universes
 
 Every GNode alias begins with a **universe** segment, and its first letter is the
-kind: `d` = dev, `h` = hybrid, `w` = production. There are many dev/hybrid
-universes (`d1`, `d2`, `hw1`, …) and exactly one production universe — the only
-place real money moves. A registry instance is scoped to a single universe:
+kind — a ladder where each step adds a requirement:
+
+- `d` = **dev** — runs locally on a single computer: all comms go through
+  localhost brokers (the isolation guarantee; the test harness and CI are dev
+  universes).
+- `h` = **hybrid** — the most flexible: distributed comms, real and simulated
+  participants mixed, re-runnable (broker vhost `hw1__1`, `hw1__2`, … — one
+  durable GNode set, many executions of time against it).
+- `w` = **production** — Scadas and MarketMakers require Validation certs, and it
+  is the only place real money moves.
+
+There are many dev/hybrid universes (`d1`, `d2`, `hw1`, …) and exactly one
+production universe. A registry instance is scoped to a single universe:
 
 ```
 universe_of(alias) = alias.split(".")[0]     # d1.isone.me.versant.keene.beech -> d1
