@@ -182,8 +182,11 @@ def test_reparent_self_collision_aborts(seeded, session_factory):
     )
     cmd = GNodeReparentCmd(new_node=new_cn, moved_child_g_node_ids=[beech_ltn.g_node_id])
 
-    with pytest.raises(Exception):
+    # The PRE-CHECK fails up front with an explicit collision error naming the
+    # alias — not a raw ledger abort mid-rewrite.
+    with pytest.raises(ReparentError, match="alias collision") as exc_info:
         auth.apply_reparent(cmd)
+    assert colliding_alias in str(exc_info.value)
 
     # Nothing moved: beech keeps its original alias, the new CN never landed.
     assert auth.get_by_alias(BEECH_LTN) is not None
@@ -217,13 +220,21 @@ def test_reparent_edges_deterministic_and_command_logged(seeded, session_factory
         assert row is not None and row.type_name == "g.node.reparent.cmd"
 
 
-def test_reparent_replay_rejected(seeded, session_factory):
-    """Distributed-readiness #2: re-applying an identical command is rejected —
-    its content hash is already in the command log (replay-safety)."""
+def test_reparent_replay_idempotent(seeded, session_factory):
+    """Distributed-readiness #2: re-applying an identical command is idempotent
+    success — its content hash is already in the log, so the retrier gets the
+    affected subtree's current state back (never a double-apply, never an error
+    it can't distinguish from a rejection)."""
     auth = PostgresAuthority(session_factory=session_factory)
     beech_ltn = seeded[BEECH_LTN]
     cmd = GNodeReparentCmd(new_node=_new_cn(), moved_child_g_node_ids=[beech_ltn.g_node_id])
 
-    auth.apply_reparent(cmd)
-    with pytest.raises(ReparentError):
-        auth.apply_reparent(cmd)
+    first = auth.apply_reparent(cmd)
+    replay = auth.apply_reparent(cmd)  # e.g. an at-least-once retry after a timeout
+
+    # Same current state back; nothing double-applied; registry still valid.
+    assert {g.alias for g in replay.nodes} == {g.alias for g in first.nodes}
+    assert {g.g_node_id for g in replay.nodes} == {g.g_node_id for g in first.nodes}
+    with session_factory() as s:
+        assert validate_registry(s) == []
+        assert s.query(GNodeSql).filter_by(alias=f"{KEENE}.sub").count() == 1

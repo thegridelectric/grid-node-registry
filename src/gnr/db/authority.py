@@ -206,16 +206,48 @@ class PostgresAuthority(AuthoritySource):
         payload = cmd.to_bytes()
         chash = command_hash(payload)
         with self._session_factory() as s:
-            # Replay-safety: a command already in the log was already applied (its
-            # effects are the current state); re-applying would double-insert N.
+            # Replay-safety, idempotent: a command already in the log was already
+            # applied — its effects ARE the current state. An at-least-once
+            # retrier gets the affected subtree back (success), not an error it
+            # cannot distinguish from a rejection.
             if s.get(CommandLogSql, chash) is not None:
-                raise ReparentError(f"command {chash[:12]}… already applied")
+                return self.get_forest([n.alias])
             if is_forest_root(n.alias):
                 raise ReparentError(f"new node {n.alias!r} is a forest root; nothing to re-parent under")
             e_alias = parent_alias(n.alias)
             e = s.query(GNodeSql).filter_by(alias=e_alias).one_or_none()
             if e is None:
                 raise ReparentError(f"parent {e_alias!r} of new node {n.alias!r} not found")
+
+            # Alias-collision PRE-CHECK: the rewrite generates new aliases; if any
+            # is permanently owned by a DIFFERENT GNodeId (uniqueness-through-time),
+            # fail up front with an explicit error naming the collisions — not a
+            # raw ledger abort mid-rewrite (which stays as defense-in-depth).
+            intended: dict[str, str] = {n.alias: n.g_node_id}
+            for child_id in cmd.moved_child_g_node_ids:
+                child = s.get(GNodeSql, child_id)
+                if child is None:
+                    raise ReparentError(f"moved child {child_id!r} not found")
+                new_prefix = moved_child_new_prefix(n.alias, child.alias)
+                for row in (
+                    s.query(GNodeSql)
+                    .filter((GNodeSql.alias == child.alias)
+                            | (GNodeSql.alias.like(child.alias + ".%")))
+                    .all()
+                ):
+                    intended[rewrite_alias(row.alias, child.alias, new_prefix)] = row.id
+            collisions = [
+                f"{claim.alias!r} (owned by {claim.g_node_id})"
+                for claim in s.query(AliasAssignmentSql)
+                .filter(AliasAssignmentSql.alias.in_(intended.keys()))
+                .all()
+                if claim.g_node_id != intended[claim.alias]
+            ]
+            if collisions:
+                raise ReparentError(
+                    "alias collision — target alias(es) permanently owned by a "
+                    f"different GNodeId: {', '.join(collisions)}"
+                )
 
             s.add(GNodeSql.from_gt(n))
             claim_alias(s, n.alias, n.g_node_id)
