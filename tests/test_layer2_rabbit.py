@@ -64,7 +64,9 @@ def provision_topology(url: str) -> None:
 
 class MarketMakerStub(Orchestrator):
     """A MarketMaker that sends the re-parent command and records the registry's
-    topology broadcast (subscriber-bound to `gnrmic_tx`)."""
+    forest broadcast — subscriber-bound to `gnrmic_tx` on its OWN alias as the
+    radio channel (keene is the stable parent under which the re-parent happens,
+    so it is the audience-known channel the registry broadcasts on)."""
 
     def __init__(self, *, settings: ServiceSettings, registry_alias: str) -> None:
         super().__init__(
@@ -75,17 +77,22 @@ class MarketMakerStub(Orchestrator):
         )
         self._registry_alias = registry_alias
         self.broadcasts: list[bytes] = []
+        self.broadcast_channels: list[str | None] = []
 
     def local_rabbit_startup(self) -> None:
+        # Exact-match channel binding: an un-channeled binding would NOT match a
+        # channeled key, so receiving anything proves the radio_channel path.
         self.subscribe_broadcast(
             from_alias=self._registry_alias,
             from_class=TransportClass.GridNodeRegistry,
             type_name=TOPOLOGY_BROADCAST,
+            radio_channel=KEENE,
         )
 
     def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
         if envelope.type_name == TOPOLOGY_BROADCAST:
             self.broadcasts.append(body)
+            self.broadcast_channels.append(getattr(envelope, "radio_channel", None))
 
 
 def _wait_for(predicate, timeout_s: float, message: str, interval_s: float = 0.1):
@@ -150,11 +157,18 @@ def test_reparent_over_real_broker(session_factory, rabbit_url):
 
         # The broadcast comes back to a real subscriber over the real broker.
         _wait_for(lambda: len(mm.broadcasts) > 0, 15, "topology broadcast received")
+
+        # Snapshot leg: nothing changed since, so the channel is the CURRENT
+        # alias — the same keene binding hears it (the anti-entropy path).
+        registry.broadcast_snapshot(KEENE)
+        _wait_for(lambda: len(mm.broadcasts) > 1, 15, "snapshot broadcast received")
     finally:
         mm.stop()
         registry.stop()
 
-    # The broadcast carries the rewritten beech subtree.
+    # The broadcast arrived on the audience-known channel (keene — the stable
+    # parent), carrying the rewritten beech subtree.
+    assert mm.broadcast_channels[0] == KEENE
     decoded = default_codec.from_dict(json.loads(mm.broadcasts[0]))
     assert isinstance(decoded, GNodeForest)
     broadcast_aliases = {g.alias for g in decoded.nodes}
@@ -162,6 +176,16 @@ def test_reparent_over_real_broker(session_factory, rabbit_url):
     assert f"{KEENE}.sub.beech" in broadcast_aliases
     assert f"{KEENE}.sub.beech.scada" in broadcast_aliases
     assert f"{KEENE}.sub.beech.ta" in broadcast_aliases
+
+    # The snapshot arrived on keene's current alias and carries the whole
+    # subtree in its post-rename form.
+    assert mm.broadcast_channels[1] == KEENE
+    snapshot = default_codec.from_dict(json.loads(mm.broadcasts[1]))
+    assert isinstance(snapshot, GNodeForest)
+    assert snapshot.roots == [KEENE]
+    snap_aliases = {g.alias for g in snapshot.nodes}
+    assert KEENE in snap_aliases
+    assert f"{KEENE}.sub.beech" in snap_aliases  # the renamed home, current form
 
     # The DB reflects the rewrite: ids stable, aliases moved, old freed.
     auth = PostgresAuthority(session_factory=session_factory)
