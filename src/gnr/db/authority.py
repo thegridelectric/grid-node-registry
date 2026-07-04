@@ -15,7 +15,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from gnr.db.alias_ledger import claim_alias
-from gnr.db.models import CommandLogSql, ConnectivityEdgeSql, GNodeSql
+from gnr.db.models import AliasAssignmentSql, CommandLogSql, ConnectivityEdgeSql, GNodeSql
 from gnr.db.session import SessionLocal
 from gnr.db.validate import is_forest_root, parent_alias, validate_registry
 from gnr.ids import command_hash, edge_id
@@ -90,6 +90,21 @@ class AuthoritySource(ABC):
     def fetch_edges(self, g_node_id: UUID4Str) -> EdgeView: ...
 
     @abstractmethod
+    def resolve_alias(self, alias: LeftRightDot) -> GNodeGt | None:
+        """Resolve an alias — **current or past** — to the GNode that owns it now.
+
+        A current alias returns its GNode; a past alias (the node has since renamed
+        away) returns the **same GNode in its current form** (new alias). None if the
+        alias was never assigned. Well-defined because an alias is permanently owned by
+        one `GNodeId` (alias-uniqueness-through-time). The caller detects staleness by
+        comparing the queried alias to the returned `alias` (a mismatch ⇒ stale)."""
+
+    @abstractmethod
+    def get_forest(self, roots: list[LeftRightDot]) -> GNodeForest:
+        """The forest under `roots`: the subtree (root + active descendants) of each
+        root alias, as `g.node.gt`s + the active edges wiring them together."""
+
+    @abstractmethod
     def apply_reparent(self, cmd: GNodeReparentCmd) -> GNodeForest: ...
 
 
@@ -132,6 +147,48 @@ class PostgresAuthority(AuthoritySource):
             return EdgeView(
                 parents=[e.to_gt() for e in parents],
                 children=[e.to_gt() for e in children],
+            )
+
+    def resolve_alias(self, alias: LeftRightDot) -> GNodeGt | None:
+        with self._session_factory() as s:
+            row = s.query(GNodeSql).filter_by(alias=alias).one_or_none()
+            if row is not None:
+                return row.to_gt()  # a current alias
+            claim = s.get(AliasAssignmentSql, alias)  # was it ever assigned?
+            if claim is None:
+                return None
+            owner = s.get(GNodeSql, claim.g_node_id)  # the permanent owner, current form
+            return owner.to_gt() if owner is not None else None
+
+    def get_forest(self, roots: list[LeftRightDot]) -> GNodeForest:
+        with self._session_factory() as s:
+            nodes: list[GNodeSql] = []
+            seen: set[str] = set()
+            for root in roots:
+                # the subtree = the root alias and every descendant (materialized path)
+                for row in (
+                    s.query(GNodeSql)
+                    .filter((GNodeSql.alias == root) | (GNodeSql.alias.like(root + ".%")))
+                    .all()
+                ):
+                    if row.id not in seen:
+                        seen.add(row.id)
+                        nodes.append(row)
+            edges: list[ConnectivityEdgeSql] = []
+            if seen:
+                edges = (
+                    s.query(ConnectivityEdgeSql)
+                    .filter(
+                        ConnectivityEdgeSql.status == GNodeStatus.Active,
+                        ConnectivityEdgeSql.from_g_node_id.in_(seen),
+                        ConnectivityEdgeSql.to_g_node_id.in_(seen),
+                    )
+                    .all()
+                )
+            return GNodeForest(
+                roots=list(roots),
+                nodes=[row.to_gt() for row in nodes],
+                edges=[edge.to_gt() for edge in edges],
             )
 
     # ---- the mutation ------------------------------------------------------

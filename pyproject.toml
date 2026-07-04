@@ -24,6 +24,7 @@ gnr = "gnr:main"
 dev = [
     "pytest>=8.0",
     "testcontainers[postgres,rabbitmq]>=4.0",
+    "httpx>=0.27",
 ]
 
 [tool.pytest.ini_options]
