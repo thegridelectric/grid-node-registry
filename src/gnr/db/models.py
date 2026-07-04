@@ -20,7 +20,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
-    relationship,
     declarative_base,
 )
 
@@ -88,10 +87,12 @@ class GNodeSql(Base):
         Enum(GNodeStatus, name="g_node_status")
     )
 
-    position_point_id: Mapped[Optional[str]] = mapped_column(
-        ForeignKey("position_points.id"), nullable=True
-    )
-    position_point: Mapped[Optional[PositionPointSql]] = relationship()
+    # An opaque location IDENTITY (a UUID), carried in the g.node.gt/command — NOT
+    # an enforced FK. The coordinate DATA is owned + populated later (encrypted) by
+    # a separate system (TaValidator), so an FK from here into a table gnr
+    # write-only-populates-later is the wrong coupling. gnr owns identity + topology;
+    # the (encrypted) geography lives elsewhere. See the positions-staging exploration.
+    position_point_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     display_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
