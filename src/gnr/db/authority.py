@@ -253,10 +253,15 @@ class PostgresAuthority(AuthoritySource):
                         f"parent {parent_alias(node.alias)!r} of {node.alias!r} "
                         "not found — create parents first"
                     )
-                if parent.status != GNodeStatus.Active:
+                # A Pending parent is legal: fleet bootstrap enters everything
+                # Pending, parents-first, and activation comes later with the
+                # TaValidator work. An ACTIVE child under a Pending parent is
+                # still rejected — validate_registry's parent-closed-active
+                # check catches it below.
+                if parent.status not in (GNodeStatus.Pending, GNodeStatus.Active):
                     raise CreateError(
                         f"parent {parent_alias(node.alias)!r} is "
-                        f"{parent.status.value}, not Active"
+                        f"{parent.status.value}; a parent must be Pending or Active"
                     )
             s.add(GNodeSql.from_gt(node))
             claim_alias(s, node.alias, node.g_node_id)
