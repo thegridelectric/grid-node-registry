@@ -2,9 +2,11 @@
 
 The cheap integration tier under the Layer-2 rabbit experiment: seed the `d1`
 dev universe into a real Postgres and exercise `PostgresAuthority` directly.
-Proves the seed loads `validate_registry`-clean, reads resolve, and a re-parent
-on a mirrored home rewrites its whole subtree — aliases, edges, and the
-alias-ledger claims — atomically, leaving the registry valid.
+Proves the seed loads `validate_registry`-clean, reads resolve, creates enter
+through the command path, a re-parent on a mirrored home rewrites its whole
+subtree — aliases and the alias-ledger claims, zero edge rows — atomically,
+and a non-tree edge (a loop's closing span) is first-class while a stored
+tree edge is rejected.
 """
 
 from __future__ import annotations
@@ -13,18 +15,23 @@ import uuid
 
 import pytest
 
-from gnr.db.authority import PostgresAuthority, ReparentError
+from gnr.db.authority import CreateError, PostgresAuthority, ReparentError
 from gnr.db.models import AliasAssignmentSql, CommandLogSql, ConnectivityEdgeSql, GNodeSql
 from gnr.db.validate import validate_registry
-from gnr.dev_universe import DEV_POSITION, seed_dev_universe
+from gnr.dev_universe import DEV_POSITION, DEV_UNIVERSE, seed_dev_universe
 from gnr.ids import command_hash, edge_id
 from gnr.sema.enums import BaseGNodeClass, GNodeStatus
-from gnr.sema.types import GNodeGt, GNodeReparentCmd
+from gnr.sema.types import GNodeCreateCmd, GNodeGt, GNodeReparentCmd
 
 pytestmark = pytest.mark.integration
 
 KEENE = "d1.isone.me.versant.keene"
 BEECH_LTN = f"{KEENE}.beech"
+ELM_LTN = f"{KEENE}.elm"
+
+
+def _authority(session_factory) -> PostgresAuthority:
+    return PostgresAuthority(session_factory=session_factory, universe=DEV_UNIVERSE)
 
 
 def _new_cn():
@@ -50,11 +57,11 @@ def seeded(session_factory):
 
 def test_seed_loads_validate_clean(seeded, session_factory):
     with session_factory() as s:
-        assert validate_registry(s) == []
+        assert validate_registry(s, DEV_UNIVERSE) == []
 
 
 def test_reads_resolve(seeded, session_factory):
-    auth = PostgresAuthority(session_factory=session_factory)
+    auth = _authority(session_factory)
     keene = seeded[KEENE]
 
     by_alias = auth.get_by_alias(KEENE)
@@ -63,15 +70,14 @@ def test_reads_resolve(seeded, session_factory):
     assert auth.assert_active(keene.g_node_id) is True
     assert auth.assert_active(str(uuid.uuid4())) is False
 
-    # keene (MarketMaker) parents the homes; beech LTN is one child edge.
+    # The dev fleet is radial: parent-child structure lives in the aliases, and
+    # no non-tree edges exist, so the edge view is empty on both sides.
     edges = auth.fetch_edges(keene.g_node_id)
-    child_ids = {e.to_g_node_id for e in edges.children}
-    assert seeded[BEECH_LTN].g_node_id in child_ids
+    assert edges.parents == [] and edges.children == []
 
 
 def test_reparent_rewrites_subtree(seeded, session_factory):
-    auth = PostgresAuthority(session_factory=session_factory)
-    keene = seeded[KEENE]
+    auth = _authority(session_factory)
     beech_ltn = seeded[BEECH_LTN]
 
     # Introduce a new ConnectivityNode under keene and move the beech home beneath
@@ -107,31 +113,13 @@ def test_reparent_rewrites_subtree(seeded, session_factory):
     assert auth.get_by_alias(f"{KEENE}.sub.beech.scada") is not None
     assert auth.get_by_alias(f"{KEENE}.sub.beech.ta") is not None
 
+    # No edge rows anywhere: the re-parent is purely the alias rewrite (the
+    # tree is the alias structure; edges are reserved for non-tree copper).
+    assert broadcast.edges == []
     with session_factory() as s:
         # Registry still valid after the atomic mutation.
-        assert validate_registry(s) == []
-
-        # Edges: keene→sub created; keene→beech retired; sub→beech active.
-        keene_to_sub = (
-            s.query(ConnectivityEdgeSql)
-            .filter_by(from_g_node_id=keene.g_node_id, to_g_node_id=new_cn.g_node_id)
-            .one()
-        )
-        assert keene_to_sub.status == GNodeStatus.Active
-
-        keene_to_beech = (
-            s.query(ConnectivityEdgeSql)
-            .filter_by(from_g_node_id=keene.g_node_id, to_g_node_id=beech_ltn.g_node_id)
-            .one()
-        )
-        assert keene_to_beech.status == GNodeStatus.PermanentlyDeactivated
-
-        sub_to_beech = (
-            s.query(ConnectivityEdgeSql)
-            .filter_by(from_g_node_id=new_cn.g_node_id, to_g_node_id=beech_ltn.g_node_id, status=GNodeStatus.Active)
-            .one()
-        )
-        assert sub_to_beech is not None
+        assert validate_registry(s, DEV_UNIVERSE) == []
+        assert s.query(ConnectivityEdgeSql).count() == 0
 
         # Alias-ledger: the moved node still owns its original alias forever, and
         # now also owns the new one (alias-uniqueness-through-time).
@@ -148,7 +136,7 @@ def test_reparent_self_collision_aborts(seeded, session_factory):
     would regenerate that alias for a *different* node must roll the whole thing
     back, leaving the registry untouched and still valid.
     """
-    auth = PostgresAuthority(session_factory=session_factory)
+    auth = _authority(session_factory)
     beech_ltn = seeded[BEECH_LTN]
     colliding_alias = f"{KEENE}.sub.beech"
 
@@ -197,24 +185,15 @@ def test_reparent_self_collision_aborts(seeded, session_factory):
         assert owner.g_node_id == squatter_id
 
 
-def test_reparent_edges_deterministic_and_command_logged(seeded, session_factory):
-    """Distributed-readiness #1/#2: edge ids are derived (not random) and the
-    applied command is appended to the content-addressed command log."""
-    auth = PostgresAuthority(session_factory=session_factory)
-    keene = seeded[KEENE]
+def test_reparent_command_logged(seeded, session_factory):
+    """Distributed-readiness #2: the applied command is appended to the
+    content-addressed command log in the same transaction."""
+    auth = _authority(session_factory)
     beech_ltn = seeded[BEECH_LTN]
-    new_cn = _new_cn()
-    cmd = GNodeReparentCmd(new_node=new_cn, moved_child_g_node_ids=[beech_ltn.g_node_id])
+    cmd = GNodeReparentCmd(new_node=_new_cn(), moved_child_g_node_ids=[beech_ltn.g_node_id])
 
-    forest = auth.apply_reparent(cmd)
+    auth.apply_reparent(cmd)
 
-    # Edge ids in the forest are exactly edge_id(from, to) — reproducible on any
-    # validator (#1), not random uuids.
-    forest_edge_ids = {e.id for e in forest.edges}
-    assert edge_id(keene.g_node_id, new_cn.g_node_id) in forest_edge_ids
-    assert edge_id(new_cn.g_node_id, beech_ltn.g_node_id) in forest_edge_ids
-
-    # The command is appended to the log, content-addressed (#2).
     with session_factory() as s:
         row = s.get(CommandLogSql, command_hash(cmd.to_bytes()))
         assert row is not None and row.type_name == "g.node.reparent.cmd"
@@ -225,7 +204,7 @@ def test_reparent_replay_idempotent(seeded, session_factory):
     success — its content hash is already in the log, so the retrier gets the
     affected subtree's current state back (never a double-apply, never an error
     it can't distinguish from a rejection)."""
-    auth = PostgresAuthority(session_factory=session_factory)
+    auth = _authority(session_factory)
     beech_ltn = seeded[BEECH_LTN]
     cmd = GNodeReparentCmd(new_node=_new_cn(), moved_child_g_node_ids=[beech_ltn.g_node_id])
 
@@ -236,5 +215,135 @@ def test_reparent_replay_idempotent(seeded, session_factory):
     assert {g.alias for g in replay.nodes} == {g.alias for g in first.nodes}
     assert {g.g_node_id for g in replay.nodes} == {g.g_node_id for g in first.nodes}
     with session_factory() as s:
-        assert validate_registry(s) == []
+        assert validate_registry(s, DEV_UNIVERSE) == []
         assert s.query(GNodeSql).filter_by(alias=f"{KEENE}.sub").count() == 1
+
+
+# ---- the create path (populate's write) -------------------------------------
+
+
+def _new_home_cn(alias: str) -> GNodeGt:
+    return GNodeGt(
+        g_node_id=str(uuid.uuid4()),
+        alias=alias,
+        base_class=BaseGNodeClass.ConnectivityNode,
+        g_node_class="ConnectivityNode",
+        status=GNodeStatus.Active,
+        position_point_id=DEV_POSITION.id,
+        display_name=alias.rsplit(".", 1)[-1],
+    )
+
+
+def test_create_enters_through_command_path(seeded, session_factory):
+    """apply_create claims the alias, logs the command, touches no edge rows."""
+    auth = _authority(session_factory)
+    node = _new_home_cn(f"{KEENE}.sub9")
+    cmd = GNodeCreateCmd(new_node=node)
+
+    forest = auth.apply_create(cmd)
+
+    assert [g.alias for g in forest.nodes] == [node.alias]
+    assert forest.edges == []
+    assert auth.get_by_alias(node.alias).g_node_id == node.g_node_id
+    with session_factory() as s:
+        assert validate_registry(s, DEV_UNIVERSE) == []
+        owner = s.get(AliasAssignmentSql, node.alias)
+        assert owner is not None and owner.g_node_id == node.g_node_id
+        row = s.get(CommandLogSql, command_hash(cmd.to_bytes()))
+        assert row is not None and row.type_name == "g.node.create.cmd"
+        assert s.query(ConnectivityEdgeSql).count() == 0
+
+    # Replay is idempotent success, not a double-apply.
+    replay = auth.apply_create(cmd)
+    assert [g.alias for g in replay.nodes] == [node.alias]
+    with session_factory() as s:
+        assert s.query(GNodeSql).filter_by(alias=node.alias).count() == 1
+
+
+def test_create_requires_parent_first(seeded, session_factory):
+    """Parents-first: a node under a nonexistent parent is rejected."""
+    auth = _authority(session_factory)
+    orphan = _new_home_cn(f"{KEENE}.nowhere.orphan")
+    with pytest.raises(CreateError, match="create parents first"):
+        auth.apply_create(GNodeCreateCmd(new_node=orphan))
+    assert auth.get_by_id(orphan.g_node_id) is None
+
+
+def test_create_rejects_foreign_universe(seeded, session_factory):
+    """The universe guard-rail on the write path: this registry serves d1."""
+    auth = _authority(session_factory)
+    foreign = _new_home_cn("hw1.isone.me.versant.keene.sub9")
+    with pytest.raises(CreateError, match="serves 'd1'"):
+        auth.apply_create(GNodeCreateCmd(new_node=foreign))
+
+
+def test_create_rejects_recycled_alias(seeded, session_factory):
+    """Alias-uniqueness-through-time holds at create: a vacated alias may never
+    bind a different GNodeId."""
+    auth = _authority(session_factory)
+    beech_ltn = seeded[BEECH_LTN]
+    # Move beech away so its old alias is vacated (live-unique would allow reuse).
+    auth.apply_reparent(GNodeReparentCmd(
+        new_node=_new_cn(), moved_child_g_node_ids=[beech_ltn.g_node_id],
+    ))
+    pretender = GNodeGt(
+        g_node_id=str(uuid.uuid4()),
+        alias=BEECH_LTN,
+        base_class=BaseGNodeClass.LeafTransactiveNode,
+        g_node_class="LeafTransactiveNode",
+        status=GNodeStatus.Active,
+        position_point_id=DEV_POSITION.id,
+        display_name="pretender",
+    )
+    with pytest.raises(CreateError, match="permanently owned"):
+        auth.apply_create(GNodeCreateCmd(new_node=pretender))
+
+
+# ---- non-tree edges: how a loop enters the registry --------------------------
+
+
+def test_loop_enters_as_non_tree_edge(seeded, session_factory):
+    """HOW A LOOP OCCURS: the copper between beech and elm closes a loop the
+    spanning tree cannot express, so it enters as a `connectivity_edges` row
+    between two nodes neither of which is the other's alias-parent. The tree
+    itself is never stored — it is the alias structure."""
+    beech = seeded[BEECH_LTN]
+    elm = seeded[ELM_LTN]
+    with session_factory() as s:
+        s.add(ConnectivityEdgeSql(
+            id=edge_id(beech.g_node_id, elm.g_node_id),
+            from_g_node_id=beech.g_node_id,
+            to_g_node_id=elm.g_node_id,
+            status=GNodeStatus.Active,
+        ))
+        s.commit()
+        # A non-tree edge is first-class: the registry stays valid.
+        assert validate_registry(s, DEV_UNIVERSE) == []
+
+    auth = _authority(session_factory)
+    # It is visible from both endpoints…
+    assert [e.to_g_node_id for e in auth.fetch_edges(beech.g_node_id).children] == [elm.g_node_id]
+    assert [e.from_g_node_id for e in auth.fetch_edges(elm.g_node_id).parents] == [beech.g_node_id]
+    # …and rides any forest that contains both endpoints.
+    forest = auth.get_forest([KEENE])
+    assert len(forest.edges) == 1
+    assert forest.edges[0].id == edge_id(beech.g_node_id, elm.g_node_id)
+
+
+def test_stored_tree_edge_is_rejected(seeded, session_factory):
+    """A stored parent-child edge is a modeling error, either direction: the
+    tree is derived from aliases, never stored."""
+    keene = seeded[KEENE]
+    beech = seeded[BEECH_LTN]
+    with session_factory() as s:
+        s.add(ConnectivityEdgeSql(
+            id=edge_id(keene.g_node_id, beech.g_node_id),
+            from_g_node_id=keene.g_node_id,
+            to_g_node_id=beech.g_node_id,
+            status=GNodeStatus.Active,
+        ))
+        s.commit()
+        violations = validate_registry(s, DEV_UNIVERSE)
+        assert len(violations) == 1
+        assert violations[0].invariant == "edge_non_tree"
+        assert "mirrors a parent-child tree edge" in violations[0].detail

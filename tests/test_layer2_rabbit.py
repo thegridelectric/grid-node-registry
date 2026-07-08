@@ -119,7 +119,7 @@ def test_reparent_over_real_broker(session_factory, rabbit_url):
 
     registry = GnrRabbit(
         settings=ServiceSettings(service_alias=REGISTRY_ALIAS, rabbit=rabbit),
-        authority=PostgresAuthority(session_factory=session_factory),
+        authority=PostgresAuthority(session_factory=session_factory, universe="d1"),
     )
     mm = MarketMakerStub(
         settings=ServiceSettings(service_alias=KEENE, rabbit=rabbit),
@@ -188,7 +188,7 @@ def test_reparent_over_real_broker(session_factory, rabbit_url):
     assert f"{KEENE}.sub.beech" in snap_aliases  # the renamed home, current form
 
     # The DB reflects the rewrite: ids stable, aliases moved, old freed.
-    auth = PostgresAuthority(session_factory=session_factory)
+    auth = PostgresAuthority(session_factory=session_factory, universe="d1")
     assert auth.get_by_alias(BEECH_LTN) is None
     moved = auth.get_by_alias(f"{KEENE}.sub.beech")
     assert moved is not None and moved.g_node_id == beech_ltn.g_node_id

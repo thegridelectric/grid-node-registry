@@ -3,6 +3,7 @@ enums:
   g.node.status: g.node.status
 types:
   connectivity.edge.gt: connectivity.edge.gt
+  g.node.create.cmd: g.node.create.cmd
   g.node.forest: g.node.forest
   g.node.forest.request: g.node.forest.request
   g.node.gt: g.node.gt

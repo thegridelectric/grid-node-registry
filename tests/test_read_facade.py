@@ -30,7 +30,7 @@ _REQ_ID = "f47ac10b-58cc-4372-a567-0e02b2c3d479"
 def client(session_factory):
     with session_factory() as s:
         seed_dev_universe(s)
-    return TestClient(create_app(authority=PostgresAuthority(session_factory=session_factory)))
+    return TestClient(create_app(authority=PostgresAuthority(session_factory=session_factory, universe="d1")))
 
 
 def _forest_request(roots):
@@ -57,12 +57,9 @@ def test_forest_under_keene(client):
     assert KEENE in aliases
     assert f"{KEENE}.beech" in aliases
     assert f"{KEENE}.beech.ta" in aliases
-    # the subtree's internal edges are wired (keene→LTN, LTN→TA, …); the incoming
-    # edge from keene's parent is NOT included (that endpoint is outside the forest).
-    assert len(forest["Edges"]) > 0
-    node_ids = {n["GNodeId"] for n in forest["Nodes"]}
-    for e in forest["Edges"]:
-        assert e["FromGNodeId"] in node_ids and e["ToGNodeId"] in node_ids
+    # Edges carries only non-tree copper (ties/loops); the dev fleet is radial,
+    # so it is empty — parent-child structure is derived from the aliases.
+    assert forest["Edges"] == []
 
 
 def test_g_node_by_id(client):
@@ -91,7 +88,7 @@ def test_g_node_by_alias_resolves_stale(client, session_factory):
         base_class=BaseGNodeClass.ConnectivityNode, g_node_class="ConnectivityNode",
         status=GNodeStatus.Active, position_point_id=DEV_POSITION.id, display_name="sub",
     )
-    PostgresAuthority(session_factory=session_factory).apply_reparent(
+    PostgresAuthority(session_factory=session_factory, universe="d1").apply_reparent(
         GNodeReparentCmd(new_node=new_cn, moved_child_g_node_ids=[beech_id])
     )
 

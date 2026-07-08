@@ -1,13 +1,15 @@
 """Whole-registry structural invariants Sema can't express per-row.
 
 These are the invariants from `executor/primary.md` "Intended invariants" that
-span *rows* — parent-closure and edge coverage. `validate_registry` scans the
-committed registry and returns every violation (the audit pass); the write
-handlers (step 5) will run the relevant check on the affected subtree at write
-time. Topology is derived from the dotted alias: a node's parent is its alias
-with the last word dropped (`parent_alias`), so the parent relation is
-self-evident from the alias and there is no separate parent pointer to keep
-consistent.
+span *rows* — universe scoping, parent-closure, and the non-tree edge rules.
+`validate_registry` scans the committed registry and returns every violation
+(the audit pass); the write handlers run it at write time. Topology is derived
+from the dotted alias: a node's parent is its alias with the last word dropped
+(`parent_alias`), so the parent relation is self-evident from the alias and
+there is no separate parent pointer to keep consistent. The alias hierarchy is
+a **spanning tree** of the grid graph; `connectivity_edges` holds only the
+copper the tree cannot express (ties, loops, meshed feeds) — parent-child
+edges are never stored.
 
 The role/class **hierarchy** parent rule (what `BaseGNodeClass` may parent what)
 is the new-class form of legacy `g-node-factory` Creation Axiom 5 (ROLE), with
@@ -44,6 +46,11 @@ class Violation:
     g_node_id: UUID4Str
     alias: LeftRightDot
     detail: str
+
+
+def universe_of(alias: LeftRightDot) -> str:
+    """The universe an alias lives in: its first dotted segment (executor *Universes*)."""
+    return alias.split(".", 1)[0]
 
 
 def parent_alias(alias: LeftRightDot) -> LeftRightDot:
@@ -88,37 +95,67 @@ def check_parent_closed_active(nodes_by_alias: dict[str, GNodeSql]) -> list[Viol
     return violations
 
 
-def check_edge_coverage(
+def check_universe_scope(
+    nodes_by_alias: dict[str, GNodeSql], universe: str
+) -> list[Violation]:
+    """Every alias in the registry carries the instance's universe as segment 0.
+
+    A registry instance is scoped to exactly one universe (executor *Universes*);
+    a row from another universe is a deployment error, never valid data.
+    """
+    return [
+        Violation(
+            "universe_scope", node.id, node.alias,
+            f"alias is in universe {universe_of(node.alias)!r}; "
+            f"this registry serves {universe!r}",
+        )
+        for node in nodes_by_alias.values()
+        if universe_of(node.alias) != universe
+    ]
+
+
+def check_edges_non_tree(
     nodes_by_alias: dict[str, GNodeSql], active_edges: list[ConnectivityEdgeSql]
 ) -> list[Violation]:
-    """Every active non-forest-root node has exactly one active edge, from its parent.
+    """Edges are non-tree copper only: real endpoints, and never a tree mirror.
 
-    For node `A` with alias-parent `P`, the registry holds exactly one active
-    `ConnectivityEdge(from=P.id, to=A.id)` — no missing edge, no extra incoming
-    edge, and the one edge comes from the alias-parent (not some other node). A
-    forest root has no GNode parent, hence no incoming edge, and is skipped.
+    The alias hierarchy is the spanning tree; `connectivity_edges` exists for the
+    copper the tree cannot express (a tie between feeders, a loop, a meshed
+    section). So for every active edge:
+      - both endpoints exist and are Active;
+      - the edge does not duplicate a parent-child pair in either direction
+        (a stored tree edge is always a modeling error — the tree is derived
+        from aliases, never stored).
+    This is how a loop enters the registry: the loop's closing span is an edge
+    row between two nodes neither of which is the other's alias-parent.
     """
-    incoming: dict[str, list[str]] = {}
-    for edge in active_edges:
-        incoming.setdefault(edge.to_g_node_id, []).append(edge.from_g_node_id)
-
+    nodes_by_id = {n.id: n for n in nodes_by_alias.values()}
     violations: list[Violation] = []
-    for node in nodes_by_alias.values():
-        if node.status != GNodeStatus.Active or is_forest_root(node.alias):
-            continue
-        froms = incoming.get(node.id, [])
-        if len(froms) != 1:
+    for edge in active_edges:
+        frm = nodes_by_id.get(edge.from_g_node_id)
+        to = nodes_by_id.get(edge.to_g_node_id)
+        if frm is None or to is None:
+            missing = edge.from_g_node_id if frm is None else edge.to_g_node_id
             violations.append(Violation(
-                "edge_coverage", node.id, node.alias,
-                f"expected exactly one active incoming edge, found {len(froms)}",
+                "edge_non_tree", edge.id, "",
+                f"active edge endpoint {missing!r} does not exist",
             ))
             continue
-        parent = nodes_by_alias.get(parent_alias(node.alias))
-        if parent is None or froms[0] != parent.id:
+        for node in (frm, to):
+            if node.status != GNodeStatus.Active:
+                violations.append(Violation(
+                    "edge_non_tree", edge.id, node.alias,
+                    f"active edge endpoint {node.alias!r} is "
+                    f"{node.status.value}, not Active",
+                ))
+        if (
+            parent_alias(to.alias) == frm.alias
+            or parent_alias(frm.alias) == to.alias
+        ):
             violations.append(Violation(
-                "edge_coverage", node.id, node.alias,
-                f"sole active incoming edge is from {froms[0]!r}, "
-                f"not the alias-parent {parent_alias(node.alias)!r}",
+                "edge_non_tree", edge.id, to.alias,
+                f"edge {frm.alias!r} ↔ {to.alias!r} mirrors a parent-child tree "
+                "edge; the tree is the alias structure and is never stored",
             ))
     return violations
 
@@ -187,8 +224,12 @@ def check_class_hierarchy(nodes_by_alias: dict[str, GNodeSql]) -> list[Violation
     return violations
 
 
-def validate_registry(session: Session) -> list[Violation]:
-    """Run every whole-registry invariant; return all violations (empty = clean)."""
+def validate_registry(session: Session, universe: str) -> list[Violation]:
+    """Run every whole-registry invariant; return all violations (empty = clean).
+
+    `universe` is the universe this registry instance serves (required — the
+    caller declares it, normally from `Settings.universe`).
+    """
     nodes_by_alias = {n.alias: n for n in session.query(GNodeSql).all()}
     active_edges = (
         session.query(ConnectivityEdgeSql)
@@ -196,7 +237,8 @@ def validate_registry(session: Session) -> list[Violation]:
         .all()
     )
     return [
+        *check_universe_scope(nodes_by_alias, universe),
         *check_parent_closed_active(nodes_by_alias),
-        *check_edge_coverage(nodes_by_alias, active_edges),
+        *check_edges_non_tree(nodes_by_alias, active_edges),
         *check_class_hierarchy(nodes_by_alias),
     ]

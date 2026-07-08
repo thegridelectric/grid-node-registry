@@ -20,8 +20,7 @@ from gnr.db.models import (
     GNodeSql,
     PositionPointSql,
 )
-from gnr.db.validate import is_forest_root, parent_alias
-from gnr.ids import deterministic_uuid4, edge_id
+from gnr.ids import deterministic_uuid4
 from gnr.sema.enums import BaseGNodeClass as B, GNodeStatus as S
 from gnr.sema.property_format import LeftRightDot
 from gnr.sema.types import GNodeGt, PositionPointGt
@@ -114,9 +113,11 @@ def build_dev_universe() -> list[GNodeGt]:
 def seed_dev_universe(session, reset: bool = True) -> list[GNodeGt]:
     """Load the dev universe into `session`'s database (re-runnable; resets first).
 
-    Inserts a distinct PositionPoint per physical node, every dev GNode, its
-    alias-ledger claim, and a covering parent→child edge for each non-forest-root
-    node. Commits, returns the GNodes.
+    Inserts a distinct PositionPoint per physical node, every dev GNode, and its
+    alias-ledger claim. No edge rows: the tree is the alias structure, and the
+    dev fleet is radial (`connectivity_edges` is reserved for non-tree copper —
+    ties/loops; the harness inserts one where a test needs it). Commits, returns
+    the GNodes.
     """
     if reset:
         for table in (ConnectivityEdgeSql, AliasAssignmentSql, GNodeSql, PositionPointSql):
@@ -124,7 +125,6 @@ def seed_dev_universe(session, reset: bool = True) -> list[GNodeGt]:
         session.flush()
 
     gnodes = build_dev_universe()
-    by_alias = {g.alias: g for g in gnodes}
 
     # A distinct PositionPoint per physical node, plus the canonical test point;
     # inserted before the GNodes so the position_point_id FKs resolve.
@@ -142,17 +142,5 @@ def seed_dev_universe(session, reset: bool = True) -> list[GNodeGt]:
     session.flush()
     for g in gnodes:
         claim_alias(session, g.alias, g.g_node_id)
-    for g in gnodes:
-        # A forest root's alias-parent is the bare universe token (not a GNode), so
-        # it gets no incoming edge; every other node gets one from its parent.
-        if is_forest_root(g.alias):
-            continue
-        parent = by_alias[parent_alias(g.alias)]
-        session.add(ConnectivityEdgeSql(
-            id=edge_id(parent.g_node_id, g.g_node_id),
-            from_g_node_id=parent.g_node_id,
-            to_g_node_id=g.g_node_id,
-            status=S.Active,
-        ))
     session.commit()
     return gnodes

@@ -10,7 +10,11 @@ sema_root="$(cd "$gnr_root/../sema" && pwd)"
 seed="$gnr_root/gnr_seed_request.yaml"
 
 cd "$sema_root"
-uv run sema snapshot prepare "$seed"
+# --allow-staged: g.node.create.cmd is status:staging while the write surface
+# converges, so this is a dev-only snapshot (marked by the generator in
+# indexes/staging.yaml + README banner). Promote the word to published and
+# drop this flag before any non-dev deployment.
+uv run sema snapshot prepare --allow-staged "$seed"
 uv run sema snapshot build --package-name gnr
 
 rsync -a --delete --exclude='__pycache__' --exclude='.DS_Store' \

@@ -23,6 +23,7 @@ initial_targets:
     g.node.gt: {}
     connectivity.edge.gt: {}
     position.point.gt: {}
+    g.node.create.cmd: {}
     g.node.reparent.cmd: {}
     g.node.forest: {}
     g.node.forest.request: {}

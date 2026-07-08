@@ -17,16 +17,21 @@ from dataclasses import dataclass
 from gnr.db.alias_ledger import claim_alias
 from gnr.db.models import AliasAssignmentSql, CommandLogSql, ConnectivityEdgeSql, GNodeSql
 from gnr.db.session import SessionLocal
-from gnr.db.validate import is_forest_root, parent_alias, validate_registry
-from gnr.ids import command_hash, edge_id
+from gnr.db.validate import is_forest_root, parent_alias, universe_of, validate_registry
+from gnr.ids import command_hash
 from gnr.sema.enums import GNodeStatus
 from gnr.sema.property_format import LeftRightDot, UUID4Str
 from gnr.sema.types import (
     ConnectivityEdgeGt,
+    GNodeCreateCmd,
     GNodeForest,
     GNodeGt,
     GNodeReparentCmd,
 )
+
+
+class CreateError(Exception):
+    """A create command could not be applied; the whole transaction rolls back."""
 
 
 class ReparentError(Exception):
@@ -35,7 +40,12 @@ class ReparentError(Exception):
 
 @dataclass(frozen=True)
 class EdgeView:
-    """Active connectivity edges incident on a GNode, parent side and child side."""
+    """Active NON-TREE connectivity edges incident on a GNode, by direction.
+
+    Parent-child tree edges are never stored (the tree is the alias structure);
+    what an edge row means is a tie/loop/meshed span — see `gnr.db.validate`
+    `check_edges_non_tree`.
+    """
 
     parents: list[ConnectivityEdgeGt]
     children: list[ConnectivityEdgeGt]
@@ -102,17 +112,27 @@ class AuthoritySource(ABC):
     @abstractmethod
     def get_forest(self, roots: list[LeftRightDot]) -> GNodeForest:
         """The forest under `roots`: the subtree (root + active descendants) of each
-        root alias, as `g.node.gt`s + the active edges wiring them together."""
+        root alias, as `g.node.gt`s + any active non-tree edges among them
+        (parent-child edges are derived from the aliases, never carried)."""
+
+    @abstractmethod
+    def apply_create(self, cmd: GNodeCreateCmd) -> GNodeForest: ...
 
     @abstractmethod
     def apply_reparent(self, cmd: GNodeReparentCmd) -> GNodeForest: ...
 
 
 class PostgresAuthority(AuthoritySource):
-    """Single-writer Postgres implementation of `AuthoritySource`."""
+    """Single-writer Postgres implementation of `AuthoritySource`.
 
-    def __init__(self, session_factory=SessionLocal) -> None:
+    `universe` is REQUIRED (no default): a registry instance is scoped to exactly
+    one universe, and every write is checked against it. Normally sourced from
+    `Settings.universe`.
+    """
+
+    def __init__(self, session_factory=SessionLocal, *, universe: str) -> None:
         self._session_factory = session_factory
+        self._universe = universe
 
     # ---- reads -------------------------------------------------------------
 
@@ -191,16 +211,79 @@ class PostgresAuthority(AuthoritySource):
                 edges=[edge.to_gt() for edge in edges],
             )
 
-    # ---- the mutation ------------------------------------------------------
+    # ---- the mutations -----------------------------------------------------
+
+    def apply_create(self, cmd: GNodeCreateCmd) -> GNodeForest:
+        """Create a single GNode — the registrar-facing write of the populate path.
+
+        One node per command, parents first: unless the node is a forest root,
+        its alias-parent must already exist and be Active. Claims the alias in
+        the through-time ledger and appends the command to the log — one
+        transaction. No edge rows: the parent-child structure is the alias
+        prefix itself. Returns the (single-node) forest rooted at the new node.
+        """
+        node = cmd.new_node
+        payload = cmd.to_bytes()
+        chash = command_hash(payload)
+        with self._session_factory() as s:
+            # Replay-safety, idempotent — same contract as apply_reparent.
+            if s.get(CommandLogSql, chash) is not None:
+                return self.get_forest([node.alias])
+            if universe_of(node.alias) != self._universe:
+                raise CreateError(
+                    f"{node.alias!r} is in universe {universe_of(node.alias)!r}; "
+                    f"this registry serves {self._universe!r}"
+                )
+            if s.get(GNodeSql, node.g_node_id) is not None:
+                raise CreateError(f"GNodeId {node.g_node_id!r} already exists")
+            claim = s.get(AliasAssignmentSql, node.alias)
+            if claim is not None and claim.g_node_id != node.g_node_id:
+                raise CreateError(
+                    f"alias {node.alias!r} is permanently owned by a different "
+                    f"GNodeId ({claim.g_node_id}) — aliases are never recycled"
+                )
+            if not is_forest_root(node.alias):
+                parent = (
+                    s.query(GNodeSql)
+                    .filter_by(alias=parent_alias(node.alias))
+                    .one_or_none()
+                )
+                if parent is None:
+                    raise CreateError(
+                        f"parent {parent_alias(node.alias)!r} of {node.alias!r} "
+                        "not found — create parents first"
+                    )
+                if parent.status != GNodeStatus.Active:
+                    raise CreateError(
+                        f"parent {parent_alias(node.alias)!r} is "
+                        f"{parent.status.value}, not Active"
+                    )
+            s.add(GNodeSql.from_gt(node))
+            claim_alias(s, node.alias, node.g_node_id)
+            s.flush()
+            violations = validate_registry(s, self._universe)
+            if violations:
+                raise CreateError(f"create would violate invariants: {violations}")
+            s.add(CommandLogSql(
+                command_hash=chash, type_name=cmd.type_name, payload=payload.decode()
+            ))
+            broadcast = GNodeForest(
+                roots=[node.alias],
+                nodes=[s.get(GNodeSql, node.g_node_id).to_gt()],
+                edges=[],
+            )
+            s.commit()
+        return broadcast
 
     def apply_reparent(self, cmd: GNodeReparentCmd) -> GNodeForest:
         """Introduce node N and re-parent the named children beneath it.
 
         The whole operation — insert N, recursively rewrite each moved child's
-        subtree aliases, retire/create the structural edges, claim every new
-        alias, and validate the result — commits in ONE transaction. Returns the
-        affected **forest** (rooted at N): its updated GNodes (new aliases) + the
-        structural edges created (E→N and N→each moved child).
+        subtree aliases, claim every new alias, and validate the result —
+        commits in ONE transaction. Edge rows are untouched: the parent-child
+        structure is the alias prefix itself. Returns the affected **forest**
+        (rooted at N): its updated GNodes (new aliases) + any active non-tree
+        edges among them.
         """
         n = cmd.new_node
         payload = cmd.to_bytes()
@@ -212,6 +295,11 @@ class PostgresAuthority(AuthoritySource):
             # cannot distinguish from a rejection.
             if s.get(CommandLogSql, chash) is not None:
                 return self.get_forest([n.alias])
+            if universe_of(n.alias) != self._universe:
+                raise ReparentError(
+                    f"{n.alias!r} is in universe {universe_of(n.alias)!r}; "
+                    f"this registry serves {self._universe!r}"
+                )
             if is_forest_root(n.alias):
                 raise ReparentError(f"new node {n.alias!r} is a forest root; nothing to re-parent under")
             e_alias = parent_alias(n.alias)
@@ -253,18 +341,7 @@ class PostgresAuthority(AuthoritySource):
             claim_alias(s, n.alias, n.g_node_id)
             s.flush()
 
-            # Edge ids are DERIVED from their endpoints (not random) so a replicated
-            # backend re-executing this command computes the same ids — the ids
-            # serialize into the g.node.forest, i.e. authoritative state.
             updated: dict[str, GNodeSql] = {n.g_node_id: s.get(GNodeSql, n.g_node_id)}
-            created_edges: list[ConnectivityEdgeSql] = []
-            edge_e_to_n = ConnectivityEdgeSql(
-                id=edge_id(e.id, n.g_node_id), from_g_node_id=e.id,
-                to_g_node_id=n.g_node_id, status=GNodeStatus.Active,
-            )
-            s.add(edge_e_to_n)
-            created_edges.append(edge_e_to_n)
-
             for child_id in cmd.moved_child_g_node_ids:
                 child = s.get(GNodeSql, child_id)
                 if child is None:
@@ -273,29 +350,27 @@ class PostgresAuthority(AuthoritySource):
                 new_prefix = moved_child_new_prefix(n.alias, old_prefix)
                 self._rewrite_prefix(s, old_prefix, new_prefix, updated)
 
-                old_edge = (
-                    s.query(ConnectivityEdgeSql)
-                    .filter_by(from_g_node_id=e.id, to_g_node_id=child_id,
-                               status=GNodeStatus.Active)
-                    .one_or_none()
-                )
-                if old_edge is not None:
-                    old_edge.status = GNodeStatus.PermanentlyDeactivated  # retire, keep for history
-                edge_n_to_child = ConnectivityEdgeSql(
-                    id=edge_id(n.g_node_id, child_id), from_g_node_id=n.g_node_id,
-                    to_g_node_id=child_id, status=GNodeStatus.Active,
-                )
-                s.add(edge_n_to_child)
-                created_edges.append(edge_n_to_child)
-
-            violations = validate_registry(s)
+            violations = validate_registry(s, self._universe)
             if violations:
                 raise ReparentError(f"re-parent would violate invariants: {violations}")
 
+            # Any active non-tree edges among the affected nodes ride along; a
+            # radial fleet has none, so this is usually empty. (A re-parent never
+            # creates or retires edges — the tree is the alias structure.)
+            affected_ids = set(updated.keys())
+            nontree_edges = (
+                s.query(ConnectivityEdgeSql)
+                .filter(
+                    ConnectivityEdgeSql.status == GNodeStatus.Active,
+                    ConnectivityEdgeSql.from_g_node_id.in_(affected_ids),
+                    ConnectivityEdgeSql.to_g_node_id.in_(affected_ids),
+                )
+                .all()
+            )
             broadcast = GNodeForest(
                 roots=[n.alias],
                 nodes=[row.to_gt() for row in updated.values()],
-                edges=[edge.to_gt() for edge in created_edges],
+                edges=[edge.to_gt() for edge in nontree_edges],
             )
             # Append the applied command to the log (the primitive; state is a
             # projection). Same transaction as the state change.

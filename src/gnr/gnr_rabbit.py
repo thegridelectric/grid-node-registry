@@ -6,9 +6,8 @@ and holds **no** registry logic of its own. The registry is a gwbase
 `TransportClass.GridNodeRegistry` (a routing identity) — deliberately NOT a Sema
 enum, since transport routing is decoupled from message decoding.
 
-First cut handles the write loop: consume a `g.node.reparent.cmd`, apply it, and
-broadcast the resulting `g.node.forest` (the affected subtree). (The read
-request/reply surface — `g.node.forest.request` → `g.node.forest` — lands next.)
+The write loop: consume a `g.node.create.cmd` or `g.node.reparent.cmd`, apply
+it, and broadcast the resulting `g.node.forest` (the affected subtree).
 """
 
 from __future__ import annotations
@@ -19,11 +18,13 @@ from gwbase import Orchestrator, ServiceSettings
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 
 from gnr.db.authority import AuthoritySource, PostgresAuthority
-from gnr.db.validate import parent_alias
+from gnr.db.validate import is_forest_root, parent_alias
 from gnr.sema.codec import default_codec
 from gnr.sema.property_format import LeftRightDot
 from gnr.sema.types import GNodeForest
+from gnr.settings import Settings
 
+CREATE_CMD = "g.node.create.cmd"
 REPARENT_CMD = "g.node.reparent.cmd"
 
 
@@ -44,10 +45,22 @@ class GnrRabbit(Orchestrator):
             my_super_alias=my_super_alias,
             my_time_coordinator_alias=my_time_coordinator_alias,
         )
-        self.authority: AuthoritySource = authority or PostgresAuthority()
+        self.authority: AuthoritySource = authority or PostgresAuthority(
+            universe=Settings().universe
+        )
 
     def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
-        if envelope.type_name == REPARENT_CMD:
+        if envelope.type_name == CREATE_CMD:
+            cmd = default_codec.from_dict(json.loads(body))
+            broadcast = self.authority.apply_create(cmd)
+            # Channel rule for a create: the audience that can already be bound
+            # is under the PARENT's alias (nobody binds an alias that didn't
+            # exist); a forest-root create has no parent, so its own alias is
+            # the only channel there is.
+            alias = cmd.new_node.alias
+            channel = alias if is_forest_root(alias) else parent_alias(alias)
+            self.broadcast_topology(broadcast, radio_channel=channel)
+        elif envelope.type_name == REPARENT_CMD:
             cmd = default_codec.from_dict(json.loads(body))
             broadcast = self.authority.apply_reparent(cmd)
             # Channel = the alias the audience is bound to. For a re-parent that

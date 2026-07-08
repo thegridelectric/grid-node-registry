@@ -15,6 +15,8 @@ jobs:
       # dev-compose opt-in uses locally.
       GNR_TEST_PG_URL: "postgresql+psycopg://gnr:gnrpass@localhost:5432/gnr"
       GNR_TEST_RABBIT_URL: "amqp://smqPublic:smqPublic@localhost:5672/d1__1"
+      # Required (no default): the universe this registry instance serves.
+      GNR_UNIVERSE: "d1"
     services:
       postgres:
         image: postgres:16

@@ -23,11 +23,14 @@ from fastapi import FastAPI, HTTPException
 from gnr.db.authority import AuthoritySource, PostgresAuthority
 from gnr.sema.property_format import LeftRightDot, UUID4Str
 from gnr.sema.types import GNodeForestRequest
+from gnr.settings import Settings
 
 
 def create_app(authority: AuthoritySource | None = None) -> FastAPI:
     """Build the read-façade app over an `AuthoritySource` (Postgres by default)."""
-    source: AuthoritySource = authority or PostgresAuthority()
+    source: AuthoritySource = authority or PostgresAuthority(
+        universe=Settings().universe
+    )
     app = FastAPI(title="Grid Node Registry — read API")
 
     @app.get("/ping")

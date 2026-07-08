@@ -13,6 +13,11 @@ from __future__ import annotations
 import os
 from urllib.parse import quote
 
+# The harness always runs a dev universe. Set before any gnr import: Settings
+# requires `universe` (no default), and `gnr.db.session` constructs Settings at
+# import time.
+os.environ.setdefault("GNR_UNIVERSE", "d1")
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
