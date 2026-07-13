@@ -347,3 +347,27 @@ def test_stored_tree_edge_is_rejected(seeded, session_factory):
         assert len(violations) == 1
         assert violations[0].invariant == "edge_non_tree"
         assert "mirrors a parent-child tree edge" in violations[0].detail
+
+
+def test_create_pending_fleet_parents_first(seeded, session_factory):
+    """Fleet bootstrap: everything enters Pending, parents-first (activation
+    comes with the TaValidator work). A Pending parent accepts a Pending
+    child; an Active child under a Pending parent is rejected by the
+    parent-closed-active invariant."""
+    auth = _authority(session_factory)
+
+    def pending_cn(alias: str) -> GNodeGt:
+        node = _new_home_cn(alias)
+        return node.model_copy(update={"status": GNodeStatus.Pending})
+
+    parent = pending_cn(f"{KEENE}.pfx")
+    child = pending_cn(f"{KEENE}.pfx.sub")
+    auth.apply_create(GNodeCreateCmd(new_node=parent))
+    auth.apply_create(GNodeCreateCmd(new_node=child))
+    assert auth.get_by_alias(child.alias).status == GNodeStatus.Pending
+    with session_factory() as s:
+        assert validate_registry(s, DEV_UNIVERSE) == []
+
+    eager = _new_home_cn(f"{KEENE}.pfx.eager")  # Active under a Pending parent
+    with pytest.raises(CreateError, match="parent_closed_active"):
+        auth.apply_create(GNodeCreateCmd(new_node=eager))
