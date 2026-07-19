@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-gnr = "gnr:main"
+gnr = "gnr.cli:main"
 
 [dependency-groups]
 dev = [

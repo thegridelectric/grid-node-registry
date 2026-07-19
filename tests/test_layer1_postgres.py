@@ -371,3 +371,26 @@ def test_create_pending_fleet_parents_first(seeded, session_factory):
     eager = _new_home_cn(f"{KEENE}.pfx.eager")  # Active under a Pending parent
     with pytest.raises(CreateError, match="parent_closed_active"):
         auth.apply_create(GNodeCreateCmd(new_node=eager))
+
+
+def test_create_active_physical_without_position_rejected(seeded, session_factory):
+    """The write guardrail for Active-physical-requires-PositionPoint: an
+    Active physical GNode whose position_point_id has no `position_points` row
+    bounces, and the whole transaction rolls back (no node row, no ledger
+    claim). The same alias then lands as Pending with an opaque position id —
+    the fleet-ingest posture (activation arrives with the TaValidator
+    positions)."""
+    auth = _authority(session_factory)
+    alias = f"{KEENE}.sub8"
+    ghost = _new_home_cn(alias).model_copy(
+        update={"position_point_id": str(uuid.uuid4())}  # opaque id, no row
+    )
+    with pytest.raises(CreateError, match="active_position"):
+        auth.apply_create(GNodeCreateCmd(new_node=ghost))
+    with session_factory() as s:
+        assert s.query(GNodeSql).filter_by(alias=alias).count() == 0
+        assert s.get(AliasAssignmentSql, alias) is None
+
+    pending = ghost.model_copy(update={"status": GNodeStatus.Pending})
+    forest = auth.apply_create(GNodeCreateCmd(new_node=pending))
+    assert [g.alias for g in forest.nodes] == [alias]

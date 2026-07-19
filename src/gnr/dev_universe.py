@@ -1,9 +1,12 @@
 """Seed a dev universe (`d1.*`) — a `validate_registry`-clean forest for harness/dev.
 
-A static, self-contained description of a dev fleet: a copper backbone, six homes
-(each an LTN + TerminalAsset + Scada), and the logical simulation services. No
-external inputs — the aliases + classes live here as a flat map, so nothing breaks
-when the layout pipeline changes elsewhere. The universe token `d1` is **not** a
+A static, self-contained description of a dev fleet: a copper backbone, six
+Active homes (each an LTN + TerminalAsset + Scada), one **Pending** home
+(`willow` — the fleet-ingest posture: position staged as an opaque id with no
+`position_points` row; activation arrives with the TaValidator work), and the
+logical simulation services. No external inputs — the aliases + classes live
+here as a flat map, so nothing breaks when the layout pipeline changes
+elsewhere. The universe token `d1` is **not** a
 GNode (it is a namespace); the top-level copper nodes are **forest roots**. Every
 GNode carries a fresh GNodeId — a simulation of the fleet, not the production nodes
 — so it runs against a dev broker + database without touching real money.
@@ -27,7 +30,11 @@ from gnr.sema.types import GNodeGt, PositionPointGt
 
 DEV_UNIVERSE = "d1"
 KEENE = "d1.isone.me.versant.keene"
-_HOMES = ("beech", "elm", "fir", "maple", "oak", "spruce")
+_HOMES = ("beech", "elm", "fir", "maple", "oak", "spruce", "willow")
+# willow is the dev universe's non-Active home: Pending, position staged (opaque
+# id, no position_points row) — the posture every real home has between fleet
+# ingest and TaValidator activation.
+PENDING_HOME = f"{KEENE}.willow"
 
 
 def _dev_universe_specs() -> dict[LeftRightDot, tuple[B, str]]:
@@ -98,12 +105,13 @@ def build_dev_universe() -> list[GNodeGt]:
     gnodes: list[GNodeGt] = []
     for alias, (base_class, g_node_class) in _dev_universe_specs().items():
         physical = base_class != B.Logical
+        pending = alias.startswith(PENDING_HOME)
         gnodes.append(GNodeGt(
             g_node_id=deterministic_uuid4(f"{_GNODE_ID_DOMAIN}/{alias}"),
             alias=alias,
             base_class=base_class,
             g_node_class=g_node_class,
-            status=S.Active,
+            status=S.Pending if pending else S.Active,
             position_point_id=dev_position_for(alias).id if physical else None,
             display_name=alias,
         ))
@@ -126,11 +134,13 @@ def seed_dev_universe(session, reset: bool = True) -> list[GNodeGt]:
 
     gnodes = build_dev_universe()
 
-    # A distinct PositionPoint per physical node, plus the canonical test point;
-    # inserted before the GNodes so the position_point_id FKs resolve.
+    # A distinct PositionPoint per Active physical node, plus the canonical test
+    # point; inserted before the GNodes so the position_point_id FKs resolve. The
+    # Pending home's position stays STAGED — opaque id, no row — the fleet-ingest
+    # posture (Active-physical-requires-PositionPoint lets Pending through).
     positions = {DEV_POSITION.id: DEV_POSITION}
     for g in gnodes:
-        if g.position_point_id is not None:
+        if g.position_point_id is not None and g.status != S.Pending:
             p = dev_position_for(g.alias)
             positions[p.id] = p
     for p in positions.values():

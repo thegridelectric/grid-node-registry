@@ -1,3 +1,4 @@
+from gwbase import ServiceSettings
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -20,8 +21,6 @@ class Settings(BaseSettings):
     db_url: SecretStr = SecretStr(
         "postgresql+psycopg://gnr:gnrpass@localhost:5435/gnr"
     )
-    log_level: str = "INFO"
-    log_dir: str = "~/.local/state/gridworks/gnr/log"
     db_echo: bool = False
 
     model_config = SettingsConfigDict(
@@ -51,3 +50,40 @@ class Settings(BaseSettings):
                 + ". See wiki/grid-node-registry (populate-and-deploy spoke)."
             )
         return v
+
+
+class RabbitRunSettings(ServiceSettings):
+    """Deploy config for `gnr rabbit`, all in the single `.env` under the one
+    `GNR_` prefix: broker connection + service identity (the inherited
+    `ServiceSettings` fields, e.g. `GNR_RABBIT__URL`, `GNR_SERVICE_ALIAS`)
+    plus which supervisor and time coordinator this registry answers to —
+    REQUIRED, no defaults: orchestration wiring is the deployer's
+    declaration."""
+
+    super_alias: str
+    time_coordinator_alias: str
+    # XDG path segment: the actor logs to ~/.local/state/gridworks/gnr/log/
+    # (gwbase paths convention; inherited default would say "gridworks").
+    service_name: str = "gnr"
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="gnr_",
+        env_nested_delimiter="__",
+        extra="ignore",
+    )
+
+
+class ApiRunSettings(BaseSettings):
+    """Bind config for `gnr api`. Loopback by default — the TLS proxy (Caddy)
+    fronts it in deploy; a non-local bind is a deliberate declaration."""
+
+    api_host: str = "127.0.0.1"
+    api_port: int = 8000
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="gnr_",
+        env_nested_delimiter="__",
+        extra="ignore",
+    )

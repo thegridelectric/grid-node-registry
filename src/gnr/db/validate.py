@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 
 from gnr.sema.enums import BaseGNodeClass, GNodeStatus
 from gnr.sema.property_format import LeftRightDot, UUID4Str
-from gnr.db.models import ConnectivityEdgeSql, GNodeSql
+from gnr.db.models import ConnectivityEdgeSql, GNodeSql, PositionPointSql
 
 
 # A **CopperNode** is the copper-topology backbone class — a ConnectivityNode or a
@@ -111,6 +111,33 @@ def check_universe_scope(
         )
         for node in nodes_by_alias.values()
         if universe_of(node.alias) != universe
+    ]
+
+
+def check_active_physical_have_position(
+    nodes_by_alias: dict[str, GNodeSql], position_ids: set[str]
+) -> list[Violation]:
+    """An Active **physical** GNode (base_class ≠ Logical — TerminalAsset,
+    LeafTransactiveNode, ConnectivityNode, MarketMaker) holds its
+    PositionPoint: the `position_points` row itself, not just the opaque id.
+    Grid position is part of what activation asserts (the TaValidator plane
+    supplies it), so until the position lands the node stays Pending. Logical
+    nodes (Scada, Other) carry no location requirement. Position *content*
+    trust remains TaValidation's concern — this checks presence only.
+    """
+    return [
+        Violation(
+            "active_position", node.id, node.alias,
+            f"Active {node.base_class} must hold its PositionPoint "
+            f"(position_point_id={node.position_point_id!r} has no row)",
+        )
+        for node in nodes_by_alias.values()
+        if node.status == GNodeStatus.Active
+        and node.base_class != BaseGNodeClass.Logical
+        and (
+            node.position_point_id is None
+            or node.position_point_id not in position_ids
+        )
     ]
 
 
@@ -236,9 +263,11 @@ def validate_registry(session: Session, universe: str) -> list[Violation]:
         .filter(ConnectivityEdgeSql.status == GNodeStatus.Active)
         .all()
     )
+    position_ids = {pid for (pid,) in session.query(PositionPointSql.id).all()}
     return [
         *check_universe_scope(nodes_by_alias, universe),
         *check_parent_closed_active(nodes_by_alias),
         *check_edges_non_tree(nodes_by_alias, active_edges),
         *check_class_hierarchy(nodes_by_alias),
+        *check_active_physical_have_position(nodes_by_alias, position_ids),
     ]
