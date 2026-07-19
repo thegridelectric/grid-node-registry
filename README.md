@@ -109,12 +109,19 @@ uv run alembic upgrade head
 The initial migration (all three tables) is committed under
 `alembic/versions/`; `uv run alembic upgrade head` against a fresh dev Postgres
 creates the schema.
-## Logs
-By default, logs should be written to
-```
-~/.local/state/gridworks/gnr/log/
-```
-This follows the GridWorks convention.
+## Running as a service
+
+`service/` holds the systemd units; on a box they are **copied** to
+`/etc/systemd/system/` (a unit change = edit in repo, re-copy,
+`sudo systemctl daemon-reload`). The box runs a clean checkout of a pushed
+SHA — never edit on the box; update = `git pull && uv sync --frozen` +
+restart.
+
+| Process | What it is | Logs |
+|---|---|---|
+| `gnr-rabbit.service` | rabbit write loop (commands in, forest broadcasts out) | `~/.local/state/gridworks/gnr/log/<service-alias>.log` (rotating) + `journalctl -u gnr-rabbit` |
+| `gnr-api.service` | public read-only HTTP façade, loopback :8000 (a TLS proxy fronts it) | `journalctl -u gnr-api` |
+| `gnr-postgres` (docker) | Postgres 16 | `docker logs gnr-postgres` |
 
 ## Next steps.
   0. ~~Set up a dev environment for postgres and then use alembic to generate
