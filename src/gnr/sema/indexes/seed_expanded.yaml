@@ -1,0 +1,47 @@
+metadata:
+  generated_from: indexes/public_registry.yaml
+  generated_at: '2026-07-20T15:56:27Z'
+  note: Transitive closure of initial_targets
+initial_targets:
+- g.node.gt:005
+- connectivity.edge.gt:000
+- position.point.gt:000
+- g.node.create.cmd:000
+- g.node.reparent.cmd:000
+- g.node.forest:000
+- g.node.forest.request:000
+worklist:
+  formats:
+    left.right.dot:
+      path: definitions/formats/left.right.dot.yaml
+    uuid4.str:
+      path: definitions/formats/uuid4.str.yaml
+  enums:
+    base.g.node.class:
+      '000':
+        path: definitions/enums/base.g.node.class/000.yaml
+    g.node.status:
+      '000':
+        path: definitions/enums/g.node.status/000.yaml
+  types:
+    connectivity.edge.gt:
+      '000':
+        path: definitions/types/connectivity.edge.gt/000.yaml
+    g.node.create.cmd:
+      '000':
+        path: definitions/types/g.node.create.cmd/000.yaml
+    g.node.forest:
+      '000':
+        path: definitions/types/g.node.forest/000.yaml
+    g.node.forest.request:
+      '000':
+        path: definitions/types/g.node.forest.request/000.yaml
+    g.node.gt:
+      '005':
+        path: definitions/types/g.node.gt/005.yaml
+    g.node.reparent.cmd:
+      '000':
+        path: definitions/types/g.node.reparent.cmd/000.yaml
+    position.point.gt:
+      '000':
+        path: definitions/types/position.point.gt/000.yaml

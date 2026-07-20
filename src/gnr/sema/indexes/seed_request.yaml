@@ -1,0 +1,29 @@
+# gnr_seed_request.yaml
+#
+# Seed request for the grid-node-registry (gnr) Sema snapshot — the GNode
+# identity / topology vocabulary the registry stores and serves. Reconstructed
+# from the vendored runtime tree (src/gnr/sema/{types,enums}); the original
+# request was never checked in.
+#
+# Built by ./build_gnr_snapshot.sh (which drives the sema repo's generator and
+# copies output/sema/* into src/gnr/sema/). The three enums
+# (base.g.node.class, g.node.class, g.node.status) are pulled in through type
+# dependency closure.
+
+# Local (Python) class/module names for the generated snapshot. The rule drops
+# a leading gw1./gw. namespace segment; none of gnr's words carry one, so every
+# name is the default PascalCase of the dotted TypeName (g.node.gt -> GNodeGt,
+# connectivity.edge.gt -> ConnectivityEdgeGt, position.point.gt ->
+# PositionPointGt). The dotted TypeName wire identity is unchanged.
+local_names:
+  strip_prefixes: [gw1, gw]
+
+initial_targets:
+  types:
+    g.node.gt: {}
+    connectivity.edge.gt: {}
+    position.point.gt: {}
+    g.node.create.cmd: {}
+    g.node.reparent.cmd: {}
+    g.node.forest: {}
+    g.node.forest.request: {}

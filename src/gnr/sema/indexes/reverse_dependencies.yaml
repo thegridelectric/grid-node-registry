@@ -1,0 +1,37 @@
+# GENERATED FILE - DO NOT EDIT
+# Generated from definitions/registry.yaml
+
+types:
+  connectivity.edge.gt:
+    '000':
+      used_by:
+      - g.node.forest:000
+  g.node.gt:
+    '005':
+      used_by:
+      - g.node.create.cmd:000
+      - g.node.forest:000
+      - g.node.reparent.cmd:000
+enums:
+  base.g.node.class:
+    '000':
+      used_by:
+      - g.node.gt:005
+  g.node.status:
+    '000':
+      used_by:
+      - connectivity.edge.gt:000
+      - g.node.gt:005
+formats:
+  left.right.dot:
+    used_by:
+    - g.node.forest.request:000
+    - g.node.forest:000
+    - g.node.gt:005
+  uuid4.str:
+    used_by:
+    - connectivity.edge.gt:000
+    - g.node.forest.request:000
+    - g.node.gt:005
+    - g.node.reparent.cmd:000
+    - position.point.gt:000

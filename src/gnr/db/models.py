@@ -20,7 +20,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
-    relationship,
     declarative_base,
 )
 
@@ -88,10 +87,12 @@ class GNodeSql(Base):
         Enum(GNodeStatus, name="g_node_status")
     )
 
-    position_point_id: Mapped[Optional[str]] = mapped_column(
-        ForeignKey("position_points.id"), nullable=True
-    )
-    position_point: Mapped[Optional[PositionPointSql]] = relationship()
+    # An opaque location IDENTITY (a UUID), carried in the g.node.gt/command — NOT
+    # an enforced FK. The coordinate DATA is owned + populated later (encrypted) by
+    # a separate system (TaValidator), so an FK from here into a table gnr
+    # write-only-populates-later is the wrong coupling. gnr owns identity + topology;
+    # the (encrypted) geography lives elsewhere. See the positions-staging exploration.
+    position_point_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     display_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
@@ -147,9 +148,6 @@ class ConnectivityEdgeSql(Base):
         ForeignKey("g_nodes.id"), index=True
     )
 
-    from_g_node_alias: Mapped[str] = mapped_column(String, index=True)
-    to_g_node_alias: Mapped[str] = mapped_column(String, index=True)
-
     status: Mapped[GNodeStatus] = mapped_column(
         Enum(GNodeStatus, name="connectivity_edge_status")
     )
@@ -174,8 +172,6 @@ class ConnectivityEdgeSql(Base):
             id=self.id,
             from_g_node_id=self.from_g_node_id,
             to_g_node_id=self.to_g_node_id,
-            from_g_node_alias=self.from_g_node_alias,
-            to_g_node_alias=self.to_g_node_alias,
             status=self.status,
         )
 
@@ -185,7 +181,62 @@ class ConnectivityEdgeSql(Base):
             id=gt.id,
             from_g_node_id=gt.from_g_node_id,
             to_g_node_id=gt.to_g_node_id,
-            from_g_node_alias=gt.from_g_node_alias,
-            to_g_node_alias=gt.to_g_node_alias,
             status=gt.status,
         )
+
+
+# ============================================================
+#  ALIAS ASSIGNMENT LEDGER
+# ============================================================
+
+class AliasAssignmentSql(Base):
+    """Append-only record of alias→GNodeId ownership, for all time.
+
+    The `alias` primary key is the guarantee for the *alias-uniqueness-through-
+    time* invariant: an alias, once bound to a `GNodeId`, is permanently owned by
+    it and can never bind to a different one — even after the node renames away
+    from it. `g_nodes.alias UNIQUE` only enforces *live* uniqueness (a rename
+    frees the old value in that row), so the permanent binding lives here.
+    Written on every create and every rename via `gnr.db.alias_ledger.claim_alias`.
+    """
+
+    __tablename__ = "alias_assignment"
+
+    alias: Mapped[str] = mapped_column(String, primary_key=True)
+    g_node_id: Mapped[str] = mapped_column(
+        ForeignKey("g_nodes.id"), nullable=False, index=True
+    )
+    first_assigned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+    )
+
+
+# ============================================================
+#  COMMAND LOG  (append-only; the chain-ready primitive)
+# ============================================================
+
+class CommandLogSql(Base):
+    """Append-only log of applied mutation commands — the source-of-truth primitive.
+
+    A ledger/chain is fundamentally an ordered log of signed commands with state
+    derived from it. Every mutation (a re-parent; later a create) is appended here
+    in the SAME transaction as the state change, keyed by a **content hash** of the
+    command's canonical serialization (`gnr.ids.command_hash`). That gives:
+      - **content-addressing** — the id IS the hash of the command bytes;
+      - **replay-safety / idempotency** — a command whose hash is already present
+        was already applied, so the PK rejects a re-apply;
+      - the foundation for moving authority off single-writer Postgres later (the
+        log moves to the chain; `g_nodes`/edges/`alias_assignment` become a
+        projection of it).
+    `applied_at` is local audit metadata, not authoritative state. See executor
+    "Distributed-readiness".
+    """
+
+    __tablename__ = "command_log"
+
+    command_hash: Mapped[str] = mapped_column(String, primary_key=True)
+    type_name: Mapped[str] = mapped_column(String, nullable=False)
+    payload: Mapped[str] = mapped_column(String, nullable=False)  # canonical Sema JSON
+    applied_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+    )

@@ -1,14 +1,11 @@
 from enum import auto
-from typing import List
 
-from gnr.sema.enums.gw_str_enum import GwStrEnum
+from gnr.sema.enums.gw_str_enum import SemaEnum
 
 
-class BaseGNodeClass(GwStrEnum):
-    """
-    Sema:
-    [https://schemas.electricity.works/enums/base.g.node.class/000](https://schemas.electricity.works/enums/base.g.node.class/000)
-    """
+class BaseGNodeClass(SemaEnum):
+    """Sema: https://schemas.electricity.works/enums/base.g.node.class/000"""
+
     TerminalAsset = auto()
     LeafTransactiveNode = auto()
     ConnectivityNode = auto()
@@ -20,7 +17,7 @@ class BaseGNodeClass(GwStrEnum):
         return cls.Logical
 
     @classmethod
-    def values(cls) -> List[str]:
+    def values(cls) -> list[str]:
         return [elt.value for elt in cls]
 
     @classmethod

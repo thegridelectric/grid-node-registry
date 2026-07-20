@@ -1,11 +1,8 @@
-from typing import Literal
-from typing_extensions import Self
-
+from typing import Literal, Self
 from pydantic import model_validator
-
 from gnr.sema.base import SemaType
 from gnr.sema.enums import GNodeStatus
-from gnr.sema.property_format import UUID4Str, LeftRightDot
+from gnr.sema.property_format import UUID4Str
 
 
 class ConnectivityEdgeGt(SemaType):
@@ -14,21 +11,18 @@ class ConnectivityEdgeGt(SemaType):
     id: UUID4Str
     from_g_node_id: UUID4Str
     to_g_node_id: UUID4Str
-    from_g_node_alias: LeftRightDot
-    to_g_node_alias: LeftRightDot
     status: GNodeStatus
     type_name: Literal["connectivity.edge.gt"] = "connectivity.edge.gt"
     version: Literal["000"] = "000"
 
-
     @model_validator(mode="after")
-    def check_axiom_1(self) -> Self:
+    def check_axiom_1(self) -> "ConnectivityEdgeGt":
         """
-        Axiom 1: A ConnectivityEdge cannot connect a GNode to itself.
+        Axiom 1: NoSelfLoop
+        FromGNodeId SHALL NOT equal ToGNodeId.
         """
         if self.from_g_node_id == self.to_g_node_id:
             raise ValueError(
-                "Axiom 1 violated! A ConnectivityEdge cannot connect a GNode "
-                f"to itself (got {self.from_g_node_id})."
+                "Axiom 1 failed: from_g_node_id and to_g_node_id must differ."
             )
         return self

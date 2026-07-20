@@ -1,0 +1,165 @@
+metadata:
+  registry_version: "1.0"
+  last_updated: "2026-07-20T15:55:00Z"
+  maintainer: "gridworks-energy"
+
+formats:
+  left.right.dot:
+    owner: gridworks-energy
+    schema_url: "https://schemas.electricity.works/formats/left.right.dot"
+    created: "2022-01-01T00:00:00Z"
+    status: "published"
+    description: "Dot-separated hierarchical identifier composed of lowercase alphanumeric segments"
+
+  uuid4.str:
+    owner: gridworks-energy
+    schema_url: "https://schemas.electricity.works/formats/uuid4.str"
+    created: "2024-09-02T15:00:00Z"
+    status: "published"
+    description: "Canonical lowercase UUIDv4 string (RFC 4122) in 8-4-4-4-12 format"
+
+enums:
+  base.g.node.class:
+    latest_version: "000"
+    owner: gridworks-energy
+    enum_type: "versioned"
+    description: "Universal physical ontology classification for Grid Nodes"
+
+    versions:
+      "000":
+        schema_url: "https://schemas.electricity.works/enums/base.g.node.class/000"
+        created: "2026-02-22T16:43:00Z"
+        status: "published"
+
+  g.node.status:
+    latest_version: "000"
+    owner: gridworks-energy
+    enum_type: "versioned"
+    description: "Lifecycle status of a Grid Node within the registry"
+
+    versions:
+      "000":
+        schema_url: "https://schemas.electricity.works/enums/g.node.status/000"
+        created: "2026-02-22T16:43:00Z"
+        status: "published"
+
+types:
+  connectivity.edge.gt:
+    latest_version: "000"
+    owner: gridworks-energy
+    versioning_strategy: "literal"
+    description: "Directed topological edge connecting two Grid Nodes in the physical electric network"
+
+    versions:
+      "000":
+        schema_url: "https://schemas.electricity.works/types/connectivity.edge.gt/000"
+        created: "2026-02-23T00:00:00Z"
+        status: "published"
+        summary: "Initial Sema version"
+        direct_dependencies:
+          structural:
+            - "g.node.status:000"
+            - "uuid4.str"
+
+  g.node.create.cmd:
+    latest_version: "000"
+    owner: gridworks-energy
+    versioning_strategy: "literal"
+    description: "Command to create a single GNode in the Grid Node Registry: the registrar-facing write by which a node enters the registry, one node per command, parents first."
+
+    versions:
+      "000":
+        schema_url: "https://schemas.electricity.works/types/g.node.create.cmd/000"
+        created: "2026-07-08T17:45:00Z"
+        status: "published"
+        summary: "Initial Sema version"
+        direct_dependencies:
+          structural:
+            - "g.node.gt:005"
+
+  g.node.forest:
+    latest_version: "000"
+    owner: gridworks-energy
+    versioning_strategy: "literal"
+    description: "A forest of Grid Node subtrees: the subtrees under one or more root aliases, carried as their current GNodes plus the connectivity edges wiring them together."
+
+    versions:
+      "000":
+        schema_url: "https://schemas.electricity.works/types/g.node.forest/000"
+        created: "2026-07-03T18:55:00Z"
+        status: "published"
+        summary: "Initial Sema version"
+        direct_dependencies:
+          structural:
+            - "connectivity.edge.gt:000"
+            - "g.node.gt:005"
+            - "left.right.dot"
+
+  g.node.forest.request:
+    latest_version: "000"
+    owner: gridworks-energy
+    versioning_strategy: "literal"
+    description: "A read query for one or more Grid Node forests: the caller names root aliases and correlates the response by RequestId."
+
+    versions:
+      "000":
+        schema_url: "https://schemas.electricity.works/types/g.node.forest.request/000"
+        created: "2026-07-03T18:55:00Z"
+        status: "published"
+        summary: "Initial Sema version"
+        direct_dependencies:
+          structural:
+            - "left.right.dot"
+            - "uuid4.str"
+
+  g.node.gt:
+    latest_version: "005"
+    owner: gridworks-energy
+    versioning_strategy: "literal"
+    description: "Fundamental identity object representing physical and logical grid nodes"
+
+    versions:
+      "005":
+        schema_url: "https://schemas.electricity.works/types/g.node.gt/005"
+        created: "2026-07-03T18:55:00Z"
+        status: "published"
+        summary: "adds axiom 6 GNodeAliasHasBody; no field changes"
+        direct_dependencies:
+          structural:
+            - "base.g.node.class:000"
+            - "g.node.status:000"
+            - "left.right.dot"
+            - "uuid4.str"
+
+  g.node.reparent.cmd:
+    latest_version: "000"
+    owner: gridworks-energy
+    versioning_strategy: "literal"
+    description: "Command to re-parent a subtree in the Grid Node Registry: introduce a new node N and re-parent one or more children beneath it."
+
+    versions:
+      "000":
+        schema_url: "https://schemas.electricity.works/types/g.node.reparent.cmd/000"
+        created: "2026-07-03T18:55:00Z"
+        status: "published"
+        summary: "Initial Sema version"
+        direct_dependencies:
+          structural:
+            - "g.node.gt:005"
+            - "uuid4.str"
+
+  position.point.gt:
+    latest_version: "000"
+    owner: gridworks-energy
+    versioning_strategy: "literal"
+    description: "Geographic position expressed in integer microdegrees (WGS84)"
+
+    versions:
+      "000":
+        schema_url: "https://schemas.electricity.works/types/position.point.gt/000"
+        created: "2026-02-24T15:00:00Z"
+        status: "published"
+        summary: "Initial Sema version"
+        direct_dependencies:
+          structural:
+            - "uuid4.str"

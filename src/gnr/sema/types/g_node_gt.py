@@ -1,18 +1,14 @@
-from typing import Literal
-from typing_extensions import Self
-
+from typing import Literal, Self
 from pydantic import model_validator
-
 from gnr.sema.base import SemaType
-from gnr.sema.enums import BaseGNodeClass, GNodeStatus
-from gnr.sema.property_format import (
-    LeftRightDot,
-    UUID4Str,
-)
+from gnr.sema.enums import BaseGNodeClass
+from gnr.sema.enums import GNodeStatus
+from gnr.sema.property_format import LeftRightDot
+from gnr.sema.property_format import UUID4Str
 
 
 class GNodeGt(SemaType):
-    """Sema: https://schemas.electricity.works/types/g.node.gt/004"""
+    """Sema: https://schemas.electricity.works/types/g.node.gt/005"""
 
     g_node_id: UUID4Str
     alias: LeftRightDot
@@ -23,50 +19,107 @@ class GNodeGt(SemaType):
     position_point_id: UUID4Str | None = None
     display_name: str | None = None
     type_name: Literal["g.node.gt"] = "g.node.gt"
-    version: Literal["004"] = "004"
+    version: Literal["005"] = "005"
 
     @model_validator(mode="after")
     def check_axiom_1(self) -> Self:
         """
-        Axiom 1: PhysicalClassAlignment.
-        For physical GNodes (BaseClass != Logical),
-        GNodeClass SHALL equal the string value of BaseClass.
+        Axiom 1: ClassConsistency
+        a. If BaseClass is not Logical, GNodeClass SHALL equal the string value of BaseClass.
+        b. If BaseClass is Logical, GNodeClass SHALL NOT equal any value of base.g.node.class other than Logical.
         """
         if self.base_class != BaseGNodeClass.Logical:
             if self.g_node_class != self.base_class.value:
                 raise ValueError(
-                    "Axiom 1 violated: Physical GNodes must align "
-                    f"GNodeClass with BaseClass. "
-                    f"Expected '{self.base_class.value}', "
-                    f"got '{self.g_node_class}'."
+                    f"Axiom 1 failed: Physical GNodes must align BaseClass and GNodeClass. "
+                    f"Expected GNodeClass='{self.base_class.value}' "
+                    f"but got '{self.g_node_class}'."
                 )
+        elif (
+            self.g_node_class in BaseGNodeClass.values()
+            and self.g_node_class != BaseGNodeClass.Logical.value
+        ):
+            raise ValueError(
+                "Axiom 1 failed: Logical GNodes must not use a non-Logical "
+                "base.g.node.class value as GNodeClass."
+            )
         return self
 
     @model_validator(mode="after")
     def check_axiom_2(self) -> Self:
         """
-        Axiom 2: PhysicalGNodeLocations.
+        Axiom 2: PhysicalGNodeLocations
         If BaseClass != Logical, PositionPointId SHALL NOT be null.
         """
         if self.base_class != BaseGNodeClass.Logical:
             if self.position_point_id is None:
                 raise ValueError(
-                    "Axiom 2 violated: Physical GNodes must declare "
-                    "PositionPointId."
+                    "Axiom 2 failed: Physical GNodes must have a PositionPointId. "
+                    f"BaseClass='{self.base_class.value}' has no location."
                 )
         return self
 
     @model_validator(mode="after")
     def check_axiom_3(self) -> Self:
         """
-        Axiom 3: AliasTransitionConsistency.
+        Axiom 3: AliasTransitionConsistency
         If PrevAlias is not null, it SHALL differ from Alias.
-        If PrevAlias is null, no alias transition is represented.
         """
-        if self.prev_alias is not None:
-            if self.prev_alias == self.alias:
-                raise ValueError(
-                    "Axiom 3 violated: PrevAlias must differ from Alias "
-                    "when present."
-                )
+        if self.prev_alias is not None and self.prev_alias == self.alias:
+            raise ValueError(
+                "Axiom 3 failed: PrevAlias must differ from Alias when present."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def check_axiom_4(self) -> Self:
+        """
+        Axiom 4: GNodeClassNamespacing
+        GNodeClass SHALL be a non-empty string containing no whitespace
+        """
+        if not self.g_node_class:
+            raise ValueError("Axiom 4 failed: GNodeClass must be non-empty.")
+        if any(char.isspace() for char in self.g_node_class):
+            raise ValueError("Axiom 4 failed: GNodeClass must not contain whitespace.")
+        return self
+
+    @model_validator(mode="after")
+    def check_axiom_5(self) -> Self:
+        """
+        Axiom 5: AliasSuffixSemantics
+        a. Alias SHALL end with ".ta" if and only if GNodeClass is "TerminalAsset".
+        b. Alias SHALL end with ".scada" if and only if GNodeClass is "Scada".
+        """
+        alias_has_ta_suffix = self.alias.endswith(".ta")
+        if (self.g_node_class == "TerminalAsset") != alias_has_ta_suffix:
+            raise ValueError(
+                'Axiom 5 failed: Alias must end with ".ta" if and only if '
+                'GNodeClass is "TerminalAsset".'
+            )
+
+        alias_has_scada_suffix = self.alias.endswith(".scada")
+        if (self.g_node_class == "Scada") != alias_has_scada_suffix:
+            raise ValueError(
+                'Axiom 5 failed: Alias must end with ".scada" if and only if '
+                'GNodeClass is "Scada".'
+            )
+        return self
+
+    @model_validator(mode="after")
+    def check_axiom_6(self) -> Self:
+        """
+        Axiom 6: GNodeAliasHasBody
+        a. Alias SHALL have at least two dotted words (the universe segment is a namespace, not a GNodeAlias, so the shortest valid GNodeAlias is like "d1.isone").
+        b. If PrevAlias is present, it SHALL likewise have at least two dotted words.
+        """
+        if len(self.alias.split(".")) < 2:
+            raise ValueError(
+                "Axiom 6 failed: Alias must have at least two dotted words "
+                "(the universe segment alone is a namespace, not a GNodeAlias)."
+            )
+        if self.prev_alias is not None and len(self.prev_alias.split(".")) < 2:
+            raise ValueError(
+                "Axiom 6 failed: PrevAlias must have at least two dotted words "
+                "(the universe segment alone is a namespace, not a GNodeAlias)."
+            )
         return self
