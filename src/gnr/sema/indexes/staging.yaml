@@ -1,3 +1,0 @@
-staging: true
-staging_words:
-- type g.node.create.cmd:000
