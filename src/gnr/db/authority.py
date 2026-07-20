@@ -185,10 +185,14 @@ class PostgresAuthority(AuthoritySource):
             nodes: list[GNodeSql] = []
             seen: set[str] = set()
             for root in roots:
-                # the subtree = the root alias and every descendant (materialized path)
+                # the subtree = the root alias and every descendant (materialized
+                # path), ordered by alias: forest serialization must be
+                # DETERMINISTIC (executor *Durability* — replay/rebroadcast
+                # compare byte-identically), and row order is not.
                 for row in (
                     s.query(GNodeSql)
                     .filter((GNodeSql.alias == root) | (GNodeSql.alias.like(root + ".%")))
+                    .order_by(GNodeSql.alias)
                     .all()
                 ):
                     if row.id not in seen:
@@ -203,6 +207,7 @@ class PostgresAuthority(AuthoritySource):
                         ConnectivityEdgeSql.from_g_node_id.in_(seen),
                         ConnectivityEdgeSql.to_g_node_id.in_(seen),
                     )
+                    .order_by(ConnectivityEdgeSql.id)  # deterministic, like nodes
                     .all()
                 )
             return GNodeForest(
