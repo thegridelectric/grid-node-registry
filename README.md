@@ -1,29 +1,30 @@
 # Grid Node Registry
 
+The **authoritative record of GridWorks grid nodes**: every GNode (the copper
+backbone of ConnectivityNodes and MarketMakers, the LeafTransactiveNodes and
+TerminalAssets behind them, and the logical services), its immutable
+`GNodeId`, its dotted **alias** (a materialized path — the parent relation is
+derived from the alias, never stored), its lifecycle status, and the non-tree
+copper edges the alias tree cannot express. The Fleet Index Service consults
+it to authorize runtime instances; provisioning and analytics read it; anyone
+may read its topology.
 
-Three SQLAlchemy models exist for
+Two surfaces, one handler core:
 
-  - `GNodeSql`
-  - `PositionPointSql`
-  - `ConnectivityEdgeSql`
+- **Writes ride RabbitMQ** as sema commands (`g.node.create.cmd`,
+  `g.node.reparent.cmd`); every applied command is content-hashed into an
+  append-only `command_log`, and each mutation broadcasts the affected
+  forest (`g.node.forest`) on the audience-known radio channel.
+- **Reads ride HTTP** — a **public, read-only API** (see below). Privacy is
+  carried by the data shape: topology only, opaque position-point ids.
 
-and corresponding Sema gt ("gridwork type") types for serialization/deserialization. These types are used for I/O to the registry and also do a certain amount of validation of the structure.
-
-Here is how to go back and forth:
-```
-gt = GNodeGt(**payload)
-db_obj = GNodeSql.from_gt(gt)
-session.add(db_obj)
-
-gt = db_obj.to_gt()
-return codec.encode(gt)
-
-```
+The registry's Postgres is a materialized view of the logged command stream;
+rebuild-from-capture is the durability story, not database backups.
 
 ## Universes
 
-Every GNode alias begins with a **universe** segment, and its first letter is the
-kind — a ladder where each step adds a requirement:
+Every GNode alias begins with a **universe** segment, and its first letter is
+the kind — a ladder where each step adds a requirement:
 
 - `d` = **dev** — runs locally on a single computer: all comms go through
   localhost brokers (the isolation guarantee; the test harness and CI are dev
@@ -31,84 +32,87 @@ kind — a ladder where each step adds a requirement:
 - `h` = **hybrid** — the most flexible: distributed comms, real and simulated
   participants mixed, re-runnable (broker vhost `hw1__1`, `hw1__2`, … — one
   durable GNode set, many executions of time against it).
-- `w` = **production** — Scadas and MarketMakers require Validation certs, and it
-  is the only place real money moves.
+- `w` = **production** — Scadas and MarketMakers require Validation certs, and
+  it is the only place real money moves. A `w…` registry refuses to boot until
+  its trust machinery exists.
 
-There are many dev/hybrid universes (`d1`, `d2`, `hw1`, …) and exactly one
-production universe. A registry instance is scoped to a single universe:
+A registry instance is scoped to exactly one universe (`GNR_UNIVERSE`,
+required, no default); every alias it holds or accepts carries that segment
+first. **The universe segment is a namespace, not a GNode** — so every alias
+has at least two words, and the registry holds a **forest** of copper
+subtrees whose roots are the top-level copper nodes.
 
-```
-universe_of(alias) = alias.split(".")[0]     # d1.isone.me.versant.keene.beech -> d1
-```
+## Invariants (why the registry exists)
 
-A **dev universe** mirrors the deployed production systems re-aliased into `d1.*`,
-so the registry (and the services around it) can be exercised end-to-end against a
-real broker and database without touching real money. The test harness is built as
-such a dev universe.
+Enforced at every write (and auditable via `gnr.db.validate.validate_registry`):
 
-**The universe segment is a namespace, not a GNode.** `d1` (the bare universe token)
-is **not** a GNodeAlias — it is the namespace the registry is scoped to. So every
-GNodeAlias has **at least two words**, and the registry holds a **forest of copper
-subtrees** rather than one rooted tree: the forest roots are the top-level copper
-nodes (a top-level `MarketMaker` like `d1.isone`, whose alias-parent is the bare
-token). A GNode is a *forest root* iff its alias-parent is the universe token.
+- **Alias uniqueness through time** — an alias, once bound to a `GNodeId`, is
+  permanently owned by it; aliases are never recycled across identities.
+- **The active forest is parent-closed** — every active non-root's parent
+  exists and is active.
+- **Edges are non-tree only** — parent-child structure is the alias prefix;
+  `connectivity_edges` holds only ties/loops/meshes.
+- **Class hierarchy** — TerminalAsset under LeafTransactiveNode under the
+  CopperNode backbone (ConnectivityNode/MarketMaker), up to a forest root.
+- **Active physical nodes hold their PositionPoint** — a physical GNode may
+  not be Active on an opaque position id alone; until its position is real it
+  stays Pending.
 
-## Requirements
+## Configuration & secrets
 
-Python version requirement: 3.12.x
-Reason: SQLAlchemy/Alembic/Postgres driver stability and CI reproducibility.
+One `.env` at the repo root, one `GNR_` prefix (`pydantic-settings`; nested
+fields via `__`, e.g. `GNR_RABBIT__URL`). Start from the template and edit:
 
-## Configuration & Secrets 
-
-The Grid Node Registry uses `pydantic-settings` for runtime configuration.
-
-All configuration is loaded through the `Settings` class:
-```
-from gnr.settings import Settings
-import dotenv
-
-settings = Settings(_env_file=dotenv.find_dotenv())
-```
-By default, all variables are loaded from a .env file in the project root.
-To get started:
-
- 1. Copy the provided template:
 ```
 cp template.env .env
 ```
- 2. Edit the `.env` file to include your database credentials and any overrides.
 
+Broker and database credentials live only in `.env`, never in code.
 
-## Local Postgres (dev)
+## Local dev
 
 A `docker-compose.yaml` runs a Postgres 16 for development:
 
 ```
 docker compose up -d           # starts container `gnr-postgres`
+uv run alembic upgrade head    # create the schema (single squashed baseline)
 ```
 
 It publishes the container's 5432 on **host port 5435** (not 5432): a
 host-local Postgres commonly holds `127.0.0.1:5432`, and macOS resolves
 `localhost` to `::1` first, so a `5432:5432` publish gets shadowed and you see
-`role "gnr" does not exist`. The matching URL is in `template.env`
-(`postgresql+psycopg://gnr:gnrpass@localhost:5435/gnr`) — note the `+psycopg`
-driver (psycopg v3, the installed one). If you ever change the container's
-credentials, remove the named volume first (`docker compose down` then
-`docker volume rm gnr_pgdata`) — Postgres only runs its init on an empty data
-dir, so a stale volume keeps the old roles.
+`role "gnr" does not exist`. The matching URL is in `template.env` — note the
+`+psycopg` driver (psycopg v3, the installed one). If you ever change the
+container's credentials, remove the named volume first (`docker compose down`
+then `docker volume rm gnr_pgdata`) — Postgres only runs its init on an empty
+data dir.
 
-## Database change management
-
-Using alembic for change management. E.g.
+To load the dev universe (the `d1` mirror of a small fleet, six Active homes
+plus one Pending):
 
 ```
-uv run alembic revision --autogenerate -m "description e.g. initial schema"
-uv run alembic upgrade head
+uv run python -c "
+from gnr.db.session import SessionLocal
+from gnr.dev_universe import seed_dev_universe
+with SessionLocal() as s: seed_dev_universe(s)"
 ```
 
-The initial migration (all three tables) is committed under
-`alembic/versions/`; `uv run alembic upgrade head` against a fresh dev Postgres
-creates the schema.
+## The public read API
+
+`uv run gnr api` serves the read façade (loopback :8000 by default; a TLS
+proxy fronts it in deploy). Interactive docs at `/docs` — every request and
+response body is a **sema word** (a versioned, immutable, registry-published
+schema), and each schema in the docs links to its canonical definition.
+
+- `POST /gnr/g-node-forest-request` — the forest under the requested roots
+- `GET /gnr/g-node-by-id/{g_node_id}` — one GNode by immutable id
+- `GET /gnr/g-node-by-alias/{alias}` — current owner of an alias; a
+  renamed-away alias resolves to the same GNode in its current form (compare
+  queried vs returned `Alias` to detect staleness)
+
+Responses are byte-identical to the sema wire form (PascalCase keys, unset
+fields absent), CORS-open, strictly read-only.
+
 ## Running as a service
 
 `service/` holds the systemd units; on a box they are **copied** to
@@ -121,35 +125,15 @@ restart.
 |---|---|---|
 | `gnr-rabbit.service` | rabbit write loop (commands in, forest broadcasts out) | `~/.local/state/gridworks/gnr/log/<service-alias>.log` (rotating) + `journalctl -u gnr-rabbit` |
 | `gnr-api.service` | public read-only HTTP façade, loopback :8000 (a TLS proxy fronts it) | `journalctl -u gnr-api` |
+| `gnr-snapshot.timer` → `.service` | periodic one-shot `gnr snapshot` — re-broadcasts each forest root (anti-entropy); cadence lives in the timer file | `journalctl -u gnr-snapshot` |
 | `gnr-postgres` (docker) | Postgres 16 | `docker logs gnr-postgres` |
 
-## Next steps.
-  0. ~~Set up a dev environment for postgres and then use alembic to generate
-  the table.~~ **Done** — `docker compose up -d` (host port 5435), then
-  `uv run alembic upgrade head`. A `GNodeGt` round-trips against the live DB
-  (`gt → GNodeSql.from_gt → session → to_gt`). See *Local Postgres (dev)* above.
-  1. Add history tables 
-  2. Enforce core invariants that aren't caught by Sema
-     - Alias Uniqueness through time
-     - Active GNode tree must be parent-closed
-     - Active physical GNode subtree must be parent-closed
-     - **ConnectivityEdge consistency** GNodeIds and Aliases match
-     - **ConnectivityEdge coverage**
-   That is, For every non-root physical GNode with alias A:
+## Tests
 
 ```
-For every non-root GNode with alias A:
-    Let P = parent alias of A
-    The registry MUST contain exactly one ConnectivityEdge
-    with FromGNodeId = <UUID(P)> AND ToGNodeId = <UUID(A)>
+uv run pytest
 ```
 
- 3. Manage lifecycle states
-    - **GNodeStatus**
-       - Pending -> Active only
-       - Active -> {Suspended, PermanentlyDeactivated}
-       - Suspended -> {Active, PermanentlyDeactivated}
-       - PermanentlyDeactivated -> no change
-    - **BaseGNodeClass**  ConnectivityNode <-> MarketMaker 
- 4. Implement API Endpoints (FastAPI)
- 5. Set up tests & CI
+Unit tests always run; the integration tiers (real Postgres and RabbitMQ via
+`testcontainers`, or an already-running broker via `GNR_TEST_RABBIT_URL`)
+self-skip when Docker isn't available. CI runs all tiers.
