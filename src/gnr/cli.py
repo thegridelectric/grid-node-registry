@@ -18,11 +18,13 @@ import argparse
 import getpass
 import json
 import os
+import ssl
 import sys
 import time
 import urllib.request
 import uuid
 
+import certifi
 import uvicorn
 
 from gwbase import Orchestrator, ServiceSettings
@@ -97,8 +99,15 @@ class _OperatorPublisher(Orchestrator):
 
 
 def _api_get(base: str, alias: str) -> dict | None:
+    # Pin the public-CA bundle explicitly: the operator env sets SSL_CERT_FILE
+    # to the GridWorks CA for the BROKER handshake, which would otherwise
+    # replace the default bundle and break verification of the API's
+    # publicly-issued cert.
+    ctx = ssl.create_default_context(cafile=certifi.where())
     try:
-        with urllib.request.urlopen(f"{base}/gnr/g-node-by-alias/{alias}", timeout=5) as r:
+        with urllib.request.urlopen(
+            f"{base}/gnr/g-node-by-alias/{alias}", timeout=5, context=ctx
+        ) as r:
             return json.load(r)
     except Exception:
         return None

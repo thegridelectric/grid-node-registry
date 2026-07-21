@@ -137,6 +137,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "certifi" },
     { name = "fastapi" },
     { name = "gridworks-base" },
     { name = "psycopg", extra = ["binary"] },
@@ -155,6 +156,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.17.2" },
+    { name = "certifi", specifier = ">=2026.6.17" },
     { name = "fastapi", specifier = ">=0.123.0" },
     { name = "gridworks-base", specifier = ">=0.5.6" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.1" },

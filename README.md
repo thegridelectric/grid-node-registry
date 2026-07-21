@@ -71,10 +71,20 @@ Broker and database credentials live only in `.env`, never in code.
 
 **Write authorization (stop-gap):** when `GNR_WRITE_PROOF_SHA256` is set,
 every create/re-parent command must carry a `Proof` whose sha256 matches, or
-it is refused before touching anything. The secret stays with the operator
+it is refused before touching anything. The secret stays with the operators
 (`gnr create` reads it from `GNR_WRITE_PROOF` or prompts); the deploy holds
 only the hash; rotation is a `.env` edit + service restart. Retired when
 certificate-based identity lands.
+
+**Operator setup (writes against the deployed registry):**
+
+```
+cp template.operator.env operator.env   # gitignored
+# fill in from the team 1Password: "Grid Node Registry Write Proof"
+# + the hw1 broker credential
+source operator.env
+uv run gnr create                       # the wizard, now aimed at prod
+```
 
 ## Local dev
 
