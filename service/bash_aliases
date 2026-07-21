@@ -4,4 +4,5 @@
 alias gnrstart='sudo systemctl start gnr-rabbit gnr-api'
 alias gnrstop='sudo systemctl stop gnr-rabbit gnr-api'
 alias gnrrestart='sudo systemctl restart gnr-rabbit gnr-api'
+alias gnrstatus='systemctl status gnr-rabbit gnr-api gnr-snapshot.timer --no-pager'
 alias gnrlog='tail -F "$HOME"/.local/state/gridworks/gnr/log/*.log'
