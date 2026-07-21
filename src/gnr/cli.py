@@ -24,10 +24,8 @@ import urllib.request
 import uuid
 
 import uvicorn
-from pydantic import SecretStr
 
 from gwbase import Orchestrator, ServiceSettings
-from gwbase.config.rabbit_settings import RabbitBrokerClient
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 
 from gnr.db.models import GNodeSql
@@ -106,7 +104,51 @@ def _api_get(base: str, alias: str) -> dict | None:
         return None
 
 
+_PHYSICAL = [c.value for c in BaseGNodeClass if c != BaseGNodeClass.Logical]
+_KNOWN_LOGICAL = [
+    "Scada", "TimeCoordinator", "WeatherForecastService", "PriceForecastService",
+]
+
+
+def _infer_base(g_node_class: str) -> BaseGNodeClass:
+    """g.node.gt axiom 1, mechanically: a GNodeClass equal to a physical
+    BaseGNodeClass value has that base; any other string is Logical."""
+    if g_node_class in _PHYSICAL:
+        return BaseGNodeClass(g_node_class)
+    return BaseGNodeClass.Logical
+
+
+def _create_wizard(args: argparse.Namespace) -> None:
+    """Fill the create args interactively: GNodeClass menu → inferred base →
+    alias → display name → GNodeId."""
+    options = _PHYSICAL + _KNOWN_LOGICAL + ["other Logical (type it)"]
+    print("GNodeClass:")
+    for i, opt in enumerate(options, 1):
+        print(f"  {i:2}. {opt}")
+    while True:
+        raw = input(f"choose [1-{len(options)}]: ").strip()
+        if raw.isdigit() and 1 <= int(raw) <= len(options):
+            break
+    picked = options[int(raw) - 1]
+    if picked.startswith("other"):
+        picked = input("GNodeClass (namespaced string, no whitespace): ").strip()
+    args.g_node_class = picked
+    base = _infer_base(picked)
+    args.base_class = base.value
+    print(f"  BaseGNodeClass (inferred, g.node.gt axiom 1): {base.value}")
+
+    args.alias = input("alias (left.right.dot, e.g. hw1.isone.me): ").strip()
+    tail = args.alias.rsplit(".", 1)[-1].title()
+    args.display_name = input(f"display name [{tail}]: ").strip() or tail
+    args.g_node_id = input("GNodeId [ENTER to mint fresh]: ").strip() or None
+
+
 def _run_create(args: argparse.Namespace) -> None:
+    if not args.alias or not args.g_node_class:
+        _create_wizard(args)
+    elif not args.base_class:
+        args.base_class = _infer_base(args.g_node_class).value
+
     api = os.environ.get("GNR_API_BASE", "http://127.0.0.1:8000").rstrip("/")
     universe = universe_of(args.alias)
 
@@ -133,14 +175,17 @@ def _run_create(args: argparse.Namespace) -> None:
     if input("ENTER to publish this create (anything else aborts) ... ").strip():
         sys.exit("aborted")
 
-    proof = os.environ.get("GNR_WRITE_PROOF") or getpass.getpass("Write Proof: ")
-    url = os.environ.get("GNR_RABBIT__URL")
-    if not url:
-        sys.exit("set GNR_RABBIT__URL for the target broker")
+    proof = os.environ.get("GNR_WRITE_PROOF") or getpass.getpass(
+        "Write Proof (empty if the target has no gate): "
+    )
+    # Broker connection from the usual settings chain: an exported
+    # GNR_RABBIT__URL wins over .env (pydantic env > env_file), so the same
+    # command serves the local rehearsal rig and a remote target.
+    rabbit = RabbitRunSettings().rabbit
     pub = _OperatorPublisher(
         settings=ServiceSettings(
             service_alias=f"{universe}.registrar",
-            rabbit=RabbitBrokerClient(url=SecretStr(url)),
+            rabbit=rabbit,
         ),
         universe=universe,
     )
@@ -189,23 +234,24 @@ def main() -> None:
     )
     create = sub.add_parser(
         "create",
-        help="operator: enter ONE GNode (Pending) over the broker",
+        help="operator: enter ONE GNode (Pending) over the broker; no "
+             "arguments → interactive wizard",
     )
-    create.add_argument("alias", help="e.g. hw1.isone.me.versant.keene")
     create.add_argument(
-        "base_class",
-        choices=[c.value for c in BaseGNodeClass],
-        help="the node's BaseGNodeClass",
+        "alias", nargs="?",
+        help="e.g. hw1.isone.me.versant.keene (omit for the wizard)",
+    )
+    create.add_argument(
+        "g_node_class", nargs="?",
+        help="GNodeClass, e.g. MarketMaker or Scada — BaseGNodeClass is "
+             "inferred (g.node.gt axiom 1)",
     )
     create.add_argument(
         "--g-node-id",
         help="use this GNodeId (e.g. a layout's); default: mint a fresh one",
     )
-    create.add_argument(
-        "--g-node-class",
-        help="when it differs from the base class (e.g. Scada for Logical)",
-    )
     create.add_argument("--display-name")
+    create.set_defaults(base_class=None)
     args = parser.parse_args()
     if args.command == "rabbit":
         _run_rabbit()
