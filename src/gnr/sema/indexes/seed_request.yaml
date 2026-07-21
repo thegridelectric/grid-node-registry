@@ -27,3 +27,5 @@ initial_targets:
     g.node.reparent.cmd: {}
     g.node.forest: {}
     g.node.forest.request: {}
+    g.node.cmd.ack: {}
+    g.node.cmd.nack: {}

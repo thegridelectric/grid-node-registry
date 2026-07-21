@@ -1,0 +1,6 @@
+{
+  "TypeName": "g.node.cmd.nack",
+  "Version": "000",
+  "CommandHash": "9c4d2f0e6a1b3c5d7e9f0a2b4c6d8e0f1a3b5c7d9e0f2a4b6c8d0e1f3a5b7c9d",
+  "Reason": "parent 'hw1.isone.me.versant.keene' of 'hw1.isone.me.versant.keene.beech' not found \u2014 create parents first"
+}

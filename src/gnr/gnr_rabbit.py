@@ -17,11 +17,17 @@ import json
 from gwbase import Orchestrator, ServiceSettings
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 
-from gnr.db.authority import AuthoritySource, PostgresAuthority
+from gnr.db.authority import (
+    AuthoritySource,
+    CreateError,
+    PostgresAuthority,
+    ReparentError,
+)
 from gnr.db.validate import is_forest_root, parent_alias
+from gnr.ids import command_hash
 from gnr.sema.codec import default_codec
 from gnr.sema.property_format import LeftRightDot
-from gnr.sema.types import GNodeForest
+from gnr.sema.types import GNodeCmdAck, GNodeCmdNack, GNodeForest
 from gnr.settings import Settings
 
 CREATE_CMD = "g.node.create.cmd"
@@ -51,26 +57,56 @@ class GnrRabbit(Orchestrator):
         )
 
     def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
-        if envelope.type_name == CREATE_CMD:
-            cmd = default_codec.from_dict(json.loads(body))
-            broadcast = self.authority.apply_create(cmd)
-            # Channel rule for a create: the audience that can already be bound
-            # is under the PARENT's alias (nobody binds an alias that didn't
-            # exist); a forest-root create has no parent, so its own alias is
-            # the only channel there is.
-            alias = cmd.new_node.alias
-            channel = alias if is_forest_root(alias) else parent_alias(alias)
-            self.broadcast_topology(broadcast, radio_channel=channel)
-        elif envelope.type_name == REPARENT_CMD:
-            cmd = default_codec.from_dict(json.loads(body))
-            broadcast = self.authority.apply_reparent(cmd)
-            # Channel = the alias the audience is bound to. For a re-parent that
-            # introduces N, that is N's parent E — the deepest ancestor whose alias
-            # is STABLE across the change, and a proper prefix of every moved
-            # node's OLD alias (so every affected listener's ancestor-binding set
-            # includes it). Keying on N's NEW alias would reach nobody: listeners
-            # bind prefixes of the aliases they knew.
-            self.broadcast_topology(broadcast, radio_channel=parent_alias(cmd.new_node.alias))
+        if envelope.type_name not in (CREATE_CMD, REPARENT_CMD):
+            return
+        # Correlation is the hash of the bytes AS PUBLISHED — the same bytes
+        # the sender can hash on its side, and the same content-address the
+        # command log records for an applied command.
+        chash = command_hash(body)
+        cmd = default_codec.from_dict(json.loads(body))
+        try:
+            if envelope.type_name == CREATE_CMD:
+                broadcast = self.authority.apply_create(cmd)
+                # Channel rule for a create: the audience that can already be
+                # bound is under the PARENT's alias (nobody binds an alias that
+                # didn't exist); a forest-root create has no parent, so its own
+                # alias is the only channel there is.
+                alias = cmd.new_node.alias
+                channel = alias if is_forest_root(alias) else parent_alias(alias)
+            else:
+                broadcast = self.authority.apply_reparent(cmd)
+                # Channel = the alias the audience is bound to. For a re-parent
+                # that introduces N, that is N's parent E — the deepest ancestor
+                # whose alias is STABLE across the change, and a proper prefix
+                # of every moved node's OLD alias (so every affected listener's
+                # ancestor-binding set includes it). Keying on N's NEW alias
+                # would reach nobody: listeners bind prefixes of aliases they
+                # knew.
+                channel = parent_alias(cmd.new_node.alias)
+        except (CreateError, ReparentError) as e:
+            # A refusal is an ANSWER, not an exception to die on: the consume
+            # loop survives (an escaped exception here tears down the channel),
+            # the sender gets the typed verdict with the reason, and — because
+            # the nack rides the bus — the ear captures the refusal as a
+            # first-class audit record.
+            self._reply(envelope, GNodeCmdNack(command_hash=chash, reason=str(e)))
+            return
+        self.broadcast_topology(broadcast, radio_channel=channel)
+        self._reply(envelope, GNodeCmdAck(command_hash=chash))
+
+    def _reply(self, envelope: RoutingEnvelope, verdict) -> None:
+        """The typed verdict (ack/nack), direct to the command's sender."""
+        from_class = envelope.from_class
+        if from_class is None:
+            return  # unknown sender class token — nowhere to address the reply
+        self.send(
+            envelope=self.direct_envelope(
+                type_name=verdict.type_name,
+                to_class=from_class,
+                to_alias=envelope.from_alias,
+            ),
+            body=verdict.to_bytes(),
+        )
 
     def broadcast_snapshot(self, root: LeftRightDot) -> None:
         """Broadcast the current forest under `root` on `radio_channel = root`.

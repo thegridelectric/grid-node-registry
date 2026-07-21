@@ -10,6 +10,18 @@ types:
       - uuid4.str
       types: []
       versionless_types: []
+  g.node.cmd.ack:
+    '000':
+      enums: []
+      formats: []
+      types: []
+      versionless_types: []
+  g.node.cmd.nack:
+    '000':
+      enums: []
+      formats: []
+      types: []
+      versionless_types: []
   g.node.create.cmd:
     '000':
       enums:
