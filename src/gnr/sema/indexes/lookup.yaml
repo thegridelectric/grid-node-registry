@@ -35,10 +35,10 @@ types:
     versions:
       '005': definitions/types/g.node.gt/005.yaml
   g.node.reparent.cmd:
-    latest_version: '000'
+    latest_version: '001'
     versioning_strategy: literal
     versions:
-      '000': definitions/types/g.node.reparent.cmd/000.yaml
+      '001': definitions/types/g.node.reparent.cmd/001.yaml
   position.point.gt:
     latest_version: '000'
     versioning_strategy: literal

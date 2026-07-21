@@ -1,0 +1,11 @@
+[Unit]
+Description=Grid Node Registry — one-shot forest snapshot broadcast (anti-entropy)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=gnr
+# Repo root as CWD so Settings' env_file=".env" resolves to the repo's .env.
+WorkingDirectory=/home/gnr/grid-node-registry
+ExecStart=/home/gnr/grid-node-registry/.venv/bin/gnr snapshot

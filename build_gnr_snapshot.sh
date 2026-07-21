@@ -10,11 +10,10 @@ sema_root="$(cd "$gnr_root/../sema" && pwd)"
 seed="$gnr_root/gnr_seed_request.yaml"
 
 cd "$sema_root"
-# --allow-staged: g.node.create.cmd is status:staging while the write surface
-# converges, so this is a dev-only snapshot (marked by the generator in
-# indexes/staging.yaml + README banner). Promote the word to published and
-# drop this flag before any non-dev deployment.
-uv run sema snapshot prepare --allow-staged "$seed"
+# Published words only: a staged word would make this a dev-only snapshot,
+# and the registry deploys to hw1. If prepare refuses on a staging word,
+# promote it (`sema promote <word> <ver>`) rather than re-adding a flag.
+uv run sema snapshot prepare "$seed"
 uv run sema snapshot build --package-name gnr
 
 rsync -a --delete --exclude='__pycache__' --exclude='.DS_Store' \
