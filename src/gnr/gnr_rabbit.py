@@ -46,7 +46,8 @@ class GnrRabbit(Orchestrator):
             my_time_coordinator_alias=my_time_coordinator_alias,
         )
         self.authority: AuthoritySource = authority or PostgresAuthority(
-            universe=Settings().universe
+            universe=Settings().universe,
+            write_proof_sha256=Settings().write_proof_sha256,
         )
 
     def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:

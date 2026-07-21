@@ -10,6 +10,7 @@ Postgres today, a distributed/on-chain record behind the same surface tomorrow).
 
 from __future__ import annotations
 
+import hashlib
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -130,9 +131,30 @@ class PostgresAuthority(AuthoritySource):
     `Settings.universe`.
     """
 
-    def __init__(self, session_factory=SessionLocal, *, universe: str) -> None:
+    def __init__(
+        self,
+        session_factory=SessionLocal,
+        *,
+        universe: str,
+        write_proof_sha256: str | None = None,
+    ) -> None:
         self._session_factory = session_factory
         self._universe = universe
+        self._write_proof_sha256 = write_proof_sha256
+
+    def _check_proof(self, proof: str | None, err: type[Exception]) -> None:
+        """Stop-gap write authorization (retired by mTLS+FIS, OPS-420): when
+        the deploy configures a proof hash, every write command must carry the
+        matching opaque Proof. Checked before anything else — including the
+        idempotent-replay short-circuit — so an unproven command never touches
+        state or learns whether its hash was ever applied."""
+        if self._write_proof_sha256 is None:
+            return
+        if (
+            proof is None
+            or hashlib.sha256(proof.encode()).hexdigest() != self._write_proof_sha256
+        ):
+            raise err("write command refused: missing or invalid Proof")
 
     # ---- reads -------------------------------------------------------------
 
@@ -227,6 +249,7 @@ class PostgresAuthority(AuthoritySource):
         transaction. No edge rows: the parent-child structure is the alias
         prefix itself. Returns the (single-node) forest rooted at the new node.
         """
+        self._check_proof(cmd.proof, CreateError)
         node = cmd.new_node
         payload = cmd.to_bytes()
         chash = command_hash(payload)
@@ -295,6 +318,7 @@ class PostgresAuthority(AuthoritySource):
         (rooted at N): its updated GNodes (new aliases) + any active non-tree
         edges among them.
         """
+        self._check_proof(cmd.proof, ReparentError)
         n = cmd.new_node
         payload = cmd.to_bytes()
         chash = command_hash(payload)

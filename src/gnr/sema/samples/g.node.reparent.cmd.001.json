@@ -1,6 +1,6 @@
 {
   "TypeName": "g.node.reparent.cmd",
-  "Version": "000",
+  "Version": "001",
   "NewNode": {
     "TypeName": "g.node.gt",
     "Version": "005",
@@ -13,5 +13,6 @@
   },
   "MovedChildGNodeIds": [
     "dcb05390-5bca-40ef-b63d-7908ccb33d9b"
-  ]
+  ],
+  "Proof": "v0:9f2c1a7e4b8d"
 }

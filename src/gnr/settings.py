@@ -22,6 +22,11 @@ class Settings(BaseSettings):
         "postgresql+psycopg://gnr:gnrpass@localhost:5435/gnr"
     )
     db_echo: bool = False
+    # Stop-gap write authorization until mTLS+FIS: when set, every write
+    # command (create / re-parent) must carry a Proof whose sha256 hex equals
+    # this value. The secret itself lives only with the operator; the deploy
+    # holds the hash. Unset = gate off (dev harness).
+    write_proof_sha256: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

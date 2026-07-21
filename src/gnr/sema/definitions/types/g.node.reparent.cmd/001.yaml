@@ -1,5 +1,5 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
-$id: "https://schemas.electricity.works/types/g.node.reparent.cmd/000"
+$id: "https://schemas.electricity.works/types/g.node.reparent.cmd/001"
 
 title: "g.node.reparent.cmd"
 type: object
@@ -25,11 +25,18 @@ properties:
       GNodeIds of the existing children that re-parent under NewNode. Each moved
       child, and every descendant, has its Alias recursively rewritten.
 
+  Proof:
+    type: string
+    description: >
+      Optional placeholder for a verifiable authorization artifact for this
+      re-parent. Its format is machinery of the authority substrate and is
+      deliberately opaque to this contract, mirroring g.node.create.cmd.
+
   TypeName:
     const: "g.node.reparent.cmd"
 
   Version:
-    const: "000"
+    const: "001"
 
 required:
   - NewNode
@@ -53,8 +60,9 @@ examples:
         "Version": "005"
       },
       "MovedChildGNodeIds": ["dcb05390-5bca-40ef-b63d-7908ccb33d9b"],
+      "Proof": "v0:9f2c1a7e4b8d",
       "TypeName": "g.node.reparent.cmd",
-      "Version": "000"
+      "Version": "001"
     }
 
 x-gridworks:
