@@ -69,6 +69,13 @@ cp template.env .env
 
 Broker and database credentials live only in `.env`, never in code.
 
+**Write authorization (stop-gap):** when `GNR_WRITE_PROOF_SHA256` is set,
+every create/re-parent command must carry a `Proof` whose sha256 matches, or
+it is refused before touching anything. The secret stays with the operator
+(`gnr create` reads it from `GNR_WRITE_PROOF` or prompts); the deploy holds
+only the hash; rotation is a `.env` edit + service restart. Retired when
+certificate-based identity lands.
+
 ## Local dev
 
 A `docker-compose.yaml` runs a Postgres 16 for development:

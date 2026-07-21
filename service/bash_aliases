@@ -1,0 +1,7 @@
+# gnr convenience aliases — pure spelling over systemctl/tail, no logic.
+# Sourced from the gnr login's ~/.bashrc at box setup; the sudoers drop-in
+# (/etc/sudoers.d/gnr) grants exactly these systemctl invocations.
+alias gnrstart='sudo systemctl start gnr-rabbit gnr-api'
+alias gnrstop='sudo systemctl stop gnr-rabbit gnr-api'
+alias gnrrestart='sudo systemctl restart gnr-rabbit gnr-api'
+alias gnrlog='tail -F "$HOME"/.local/state/gridworks/gnr/log/*.log'
