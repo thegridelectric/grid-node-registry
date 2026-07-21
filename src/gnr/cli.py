@@ -18,11 +18,13 @@ import argparse
 import getpass
 import json
 import os
+import ssl
 import sys
 import time
 import urllib.request
 import uuid
 
+import certifi
 import uvicorn
 
 from gwbase import Orchestrator, ServiceSettings
@@ -32,6 +34,7 @@ from gnr.db.models import GNodeSql
 from gnr.db.session import SessionLocal
 from gnr.db.validate import is_forest_root, universe_of
 from gnr.gnr_rabbit import GnrRabbit
+from gnr.ids import command_hash
 from gnr.sema.enums import BaseGNodeClass, GNodeStatus
 from gnr.sema.types import GNodeCreateCmd, GNodeGt
 from gnr.settings import ApiRunSettings, RabbitRunSettings
@@ -81,8 +84,10 @@ def _run_snapshot(roots: list[str]) -> None:
 
 
 class _OperatorPublisher(Orchestrator):
-    """MarketMaker-class publisher for operator commands; hears nothing back
-    (verification rides the read API)."""
+    """MarketMaker-class publisher for operator commands. The registry
+    replies with a typed verdict (`g.node.cmd.ack` / `g.node.cmd.nack`)
+    direct to this alias; verdicts land in `self.verdicts` keyed by the
+    command's content hash."""
 
     def __init__(self, *, settings: ServiceSettings, universe: str) -> None:
         super().__init__(
@@ -91,14 +96,24 @@ class _OperatorPublisher(Orchestrator):
             my_super_alias=f"{universe}.super",
             my_time_coordinator_alias=f"{universe}.time",
         )
+        self.verdicts: dict[str, dict] = {}
 
     def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
-        pass
+        if envelope.type_name in ("g.node.cmd.ack", "g.node.cmd.nack"):
+            verdict = json.loads(body)
+            self.verdicts[verdict["CommandHash"]] = verdict
 
 
 def _api_get(base: str, alias: str) -> dict | None:
+    # Pin the public-CA bundle explicitly: the operator env sets SSL_CERT_FILE
+    # to the GridWorks CA for the BROKER handshake, which would otherwise
+    # replace the default bundle and break verification of the API's
+    # publicly-issued cert.
+    ctx = ssl.create_default_context(cafile=certifi.where())
     try:
-        with urllib.request.urlopen(f"{base}/gnr/g-node-by-alias/{alias}", timeout=5) as r:
+        with urllib.request.urlopen(
+            f"{base}/gnr/g-node-by-alias/{alias}", timeout=5, context=ctx
+        ) as r:
             return json.load(r)
     except Exception:
         return None
@@ -197,23 +212,38 @@ def _run_create(args: argparse.Namespace) -> None:
         sys.exit("could not reach the broker")
     try:
         cmd = GNodeCreateCmd(new_node=node, proof=proof or None)
+        payload = cmd.to_bytes()
+        chash = command_hash(payload)
         pub.send(
             envelope=pub.direct_envelope(
                 type_name=cmd.type_name,
                 to_class=TransportClass.GridNodeRegistry,
                 to_alias=f"{universe}.registry",
             ),
-            body=cmd.to_bytes(),
+            body=payload,
         )
+        # The registry answers with a typed verdict, correlated by the hash
+        # of the bytes we just published.
+        verdict = None
+        deadline = time.time() + 10
+        while verdict is None and time.time() < deadline:
+            verdict = pub.verdicts.get(chash)
+            time.sleep(0.1)
+        if verdict is not None and verdict["TypeName"] == "g.node.cmd.nack":
+            sys.exit(f"✗ refused: {verdict['Reason']}")
+        if verdict is not None:
+            print(f"✓ applied (ack {chash[:12]}…) — confirming visibility …")
+        # Visibility proof either way: the node on the same public surface
+        # everyone reads. (No verdict after 10s ⇒ an older registry; the poll
+        # is then the only signal.)
         for _ in range(40):
             if _api_get(api, node.alias) is not None:
                 print(f"✓ {node.alias} is in the registry ({node.g_node_id})")
                 return
             time.sleep(0.5)
         sys.exit(
-            f"✗ {node.alias} did not appear within 20s — likely a refused "
-            "command (bad Proof? parent missing?); check the registry's "
-            "gnr-rabbit journal"
+            f"✗ {node.alias} not visible on the read API within 20s — check "
+            "the registry's gnr-rabbit journal"
         )
     finally:
         pub.stop()

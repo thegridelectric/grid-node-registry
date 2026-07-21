@@ -14,6 +14,16 @@ types:
     versioning_strategy: literal
     versions:
       '000': definitions/types/connectivity.edge.gt/000.yaml
+  g.node.cmd.ack:
+    latest_version: '000'
+    versioning_strategy: literal
+    versions:
+      '000': definitions/types/g.node.cmd.ack/000.yaml
+  g.node.cmd.nack:
+    latest_version: '000'
+    versioning_strategy: literal
+    versions:
+      '000': definitions/types/g.node.cmd.nack/000.yaml
   g.node.create.cmd:
     latest_version: '000'
     versioning_strategy: literal

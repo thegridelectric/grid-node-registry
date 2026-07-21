@@ -9,6 +9,9 @@ __pycache__/
 # scratch files
 scratch*
 
+# filled-in operator environment (secrets; template.operator.env is the template)
+operator.env
+
 # Distribution / packaging
 .Python
 build/
