@@ -39,11 +39,11 @@ types:
         summary: "adds axiom 6 GNodeAliasHasBody; no field changes"
 
   g.node.reparent.cmd:
-    latest_version: "000"
+    latest_version: "001"
     versioning_strategy: "literal"
     versions:
-      "000":
-        summary: "Initial Sema version"
+      "001":
+        summary: "- Proof: new optional opaque authorization artifact for this re-parent (format is machinery of the authority substrate, mirroring g.node.create.cmd)"
 
   position.point.gt:
     latest_version: "000"

@@ -11,7 +11,7 @@ types:
       used_by:
       - g.node.create.cmd:000
       - g.node.forest:000
-      - g.node.reparent.cmd:000
+      - g.node.reparent.cmd:001
 enums:
   base.g.node.class:
     '000':
@@ -33,5 +33,5 @@ formats:
     - connectivity.edge.gt:000
     - g.node.forest.request:000
     - g.node.gt:005
-    - g.node.reparent.cmd:000
+    - g.node.reparent.cmd:001
     - position.point.gt:000

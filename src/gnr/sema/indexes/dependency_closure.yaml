@@ -52,7 +52,7 @@ types:
       types: []
       versionless_types: []
   g.node.reparent.cmd:
-    '000':
+    '001':
       enums:
       - base.g.node.class:000
       - g.node.status:000
