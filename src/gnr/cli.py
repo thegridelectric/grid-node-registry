@@ -225,7 +225,7 @@ def _run_create(args: argparse.Namespace) -> None:
             envelope=pub.direct_envelope(
                 type_name=cmd.type_name,
                 to_class=TransportClass.GridNodeRegistry,
-                to_alias=f"{universe}.registry",
+                to_alias=f"{universe}.gnr",
             ),
             body=payload,
         )

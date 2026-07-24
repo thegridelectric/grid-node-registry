@@ -40,7 +40,7 @@ from test_layer2_rabbit import provision_topology
 
 pytestmark = pytest.mark.integration
 
-REGISTRY_ALIAS = "d1.registry"
+REGISTRY_ALIAS = "d1.gnr"
 
 
 def _wipe(session_factory):
