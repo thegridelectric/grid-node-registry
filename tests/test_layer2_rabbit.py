@@ -34,7 +34,7 @@ from gnr.sema.types import GNodeForest, GNodeGt, GNodeReparentCmd
 
 pytestmark = pytest.mark.integration
 
-REGISTRY_ALIAS = "d1.registry"
+REGISTRY_ALIAS = "d1.gnr"
 KEENE = "d1.isone.me.versant.keene"  # a MarketMaker — authority over the beech subtree
 BEECH_LTN = f"{KEENE}.beech"
 TOPOLOGY_BROADCAST = "g.node.forest"
