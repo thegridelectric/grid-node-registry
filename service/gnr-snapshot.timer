@@ -3,7 +3,7 @@ Description=Snapshot-broadcast cadence — deploy config: edit, re-copy, daemon-
 
 [Timer]
 OnBootSec=5min
-OnUnitActiveSec=1h
+OnUnitActiveSec=24h
 
 [Install]
 WantedBy=timers.target

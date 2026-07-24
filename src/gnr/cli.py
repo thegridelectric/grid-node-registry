@@ -193,13 +193,20 @@ def _run_create(args: argparse.Namespace) -> None:
     proof = os.environ.get("GNR_WRITE_PROOF") or getpass.getpass(
         "Write Proof (empty if the target has no gate): "
     )
+    # Broker TLS trust: when the target broker's cert chains to a private CA
+    # (GNR_BROKER_CA_FILE), scope the trust override to THIS process only —
+    # exporting SSL_CERT_FILE shell-wide poisons every other tool's TLS
+    # (pip/uv included: the env var REPLACES the default bundle).
+    broker_ca = os.environ.get("GNR_BROKER_CA_FILE")
+    if broker_ca:
+        os.environ["SSL_CERT_FILE"] = broker_ca
     # Broker connection from the usual settings chain: an exported
     # GNR_RABBIT__URL wins over .env (pydantic env > env_file), so the same
     # command serves the local rehearsal rig and a remote target.
     rabbit = RabbitRunSettings().rabbit
     pub = _OperatorPublisher(
         settings=ServiceSettings(
-            service_alias=f"{universe}.registrar",
+            service_alias=f"{universe}.gnregistrar",
             rabbit=rabbit,
         ),
         universe=universe,
