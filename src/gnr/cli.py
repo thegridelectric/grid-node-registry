@@ -206,7 +206,7 @@ def _run_create(args: argparse.Namespace) -> None:
     rabbit = RabbitRunSettings().rabbit
     pub = _OperatorPublisher(
         settings=ServiceSettings(
-            service_alias=f"{universe}.registrar",
+            service_alias=f"{universe}.gnregistrar",
             rabbit=rabbit,
         ),
         universe=universe,
