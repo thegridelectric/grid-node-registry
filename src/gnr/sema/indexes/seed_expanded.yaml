@@ -1,6 +1,6 @@
 metadata:
   generated_from: indexes/public_registry.yaml
-  generated_at: '2026-07-21T14:30:52Z'
+  generated_at: '2026-07-29T16:05:50Z'
   note: Transitive closure of initial_targets
 initial_targets:
 - g.node.gt:005
@@ -8,7 +8,7 @@ initial_targets:
 - position.point.gt:000
 - g.node.create.cmd:000
 - g.node.reparent.cmd:001
-- g.node.forest:000
+- g.node.forest:001
 - g.node.forest.request:000
 - g.node.cmd.ack:000
 - g.node.cmd.nack:000
@@ -16,6 +16,8 @@ worklist:
   formats:
     left.right.dot:
       path: definitions/formats/left.right.dot.yaml
+    utc.milliseconds:
+      path: definitions/formats/utc.milliseconds.yaml
     uuid4.str:
       path: definitions/formats/uuid4.str.yaml
   enums:
@@ -39,8 +41,8 @@ worklist:
       '000':
         path: definitions/types/g.node.create.cmd/000.yaml
     g.node.forest:
-      '000':
-        path: definitions/types/g.node.forest/000.yaml
+      '001':
+        path: definitions/types/g.node.forest/001.yaml
     g.node.forest.request:
       '000':
         path: definitions/types/g.node.forest.request/000.yaml

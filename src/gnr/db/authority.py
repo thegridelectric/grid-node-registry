@@ -11,6 +11,7 @@ Postgres today, a distributed/on-chain record behind the same surface tomorrow).
 from __future__ import annotations
 
 import hashlib
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -53,6 +54,13 @@ class EdgeView:
 
 
 # ---- pure alias-rewrite logic (no DB — unit-testable) ----------------------
+
+def _send_time_ms() -> int:
+    """The registry's clock at forest assembly (SendTimeMs, sender-time
+    standard). Always wall-clock: the registry is a notary and is never
+    simulated, even when the fleet it describes runs simulated time."""
+    return int(time.time() * 1000)
+
 
 def in_subtree(alias: LeftRightDot, prefix: LeftRightDot) -> bool:
     """True if `alias` is `prefix` itself or a descendant of it (materialized path)."""
@@ -236,6 +244,7 @@ class PostgresAuthority(AuthoritySource):
                 roots=list(roots),
                 nodes=[row.to_gt() for row in nodes],
                 edges=[edge.to_gt() for edge in edges],
+                send_time_ms=_send_time_ms(),
             )
 
     # ---- the mutations -----------------------------------------------------
@@ -304,6 +313,7 @@ class PostgresAuthority(AuthoritySource):
                 roots=[node.alias],
                 nodes=[s.get(GNodeSql, node.g_node_id).to_gt()],
                 edges=[],
+                send_time_ms=_send_time_ms(),
             )
             s.commit()
         return broadcast
@@ -405,6 +415,7 @@ class PostgresAuthority(AuthoritySource):
                 roots=[n.alias],
                 nodes=[row.to_gt() for row in updated.values()],
                 edges=[edge.to_gt() for edge in nontree_edges],
+                send_time_ms=_send_time_ms(),
             )
             # Append the applied command to the log (the primitive; state is a
             # projection). Same transaction as the state change.

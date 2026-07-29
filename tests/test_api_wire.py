@@ -74,7 +74,7 @@ def test_openapi_schemas_link_to_sema_definitions():
     schemas = spec["components"]["schemas"]
     for name, type_name, version in [
         ("GNodeGt", "g.node.gt", "005"),
-        ("GNodeForest", "g.node.forest", "000"),
+        ("GNodeForest", "g.node.forest", "001"),
         ("GNodeForestRequest", "g.node.forest.request", "000"),
     ]:
         url = SEMA_DEFINITION_URL.format(type_name=type_name, version=version)

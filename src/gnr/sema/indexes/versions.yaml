@@ -32,11 +32,11 @@ types:
         summary: "Initial Sema version"
 
   g.node.forest:
-    latest_version: "000"
+    latest_version: "001"
     versioning_strategy: "literal"
     versions:
-      "000":
-        summary: "Initial Sema version"
+      "001":
+        summary: "- SendTimeMs: new optional sender-clock stamp (epoch ms) at forest assembly; the registry stamps wall-clock — it is never simulated (sender-time standard, first adopter)"
 
   g.node.forest.request:
     latest_version: "000"

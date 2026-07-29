@@ -7,7 +7,7 @@ Sema types are used for validation (via the codec) before any insert/update.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 from sqlalchemy import (
@@ -45,7 +45,7 @@ class PositionPointSql(Base):
     longitude_micro_deg: Mapped[int] = mapped_column()
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
     def to_gt(self) -> PositionPointGt:
@@ -97,7 +97,7 @@ class GNodeSql(Base):
     display_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
     # -------------------
@@ -153,7 +153,7 @@ class ConnectivityEdgeSql(Base):
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
     __table_args__ = (
@@ -207,7 +207,7 @@ class AliasAssignmentSql(Base):
         ForeignKey("g_nodes.id"), nullable=False, index=True
     )
     first_assigned_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
 
 
@@ -238,5 +238,5 @@ class CommandLogSql(Base):
     type_name: Mapped[str] = mapped_column(String, nullable=False)
     payload: Mapped[str] = mapped_column(String, nullable=False)  # canonical Sema JSON
     applied_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )

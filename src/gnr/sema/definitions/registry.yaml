@@ -1,6 +1,6 @@
 metadata:
   registry_version: "1.0"
-  last_updated: "2026-07-21T14:30:00Z"
+  last_updated: "2026-07-29T15:45:00Z"
   maintainer: "gridworks-energy"
 
 formats:
@@ -10,6 +10,13 @@ formats:
     created: "2022-01-01T00:00:00Z"
     status: "published"
     description: "Dot-separated hierarchical identifier composed of lowercase alphanumeric segments"
+
+  utc.milliseconds:
+    owner: gridworks-energy
+    schema_url: "https://schemas.electricity.works/formats/utc.milliseconds"
+    created: "2024-09-02T15:00:00Z"
+    status: "published"
+    description: "UTC timestamp in whole milliseconds since Unix epoch (2000–3000 range)"
 
   uuid4.str:
     owner: gridworks-energy
@@ -108,22 +115,23 @@ types:
             - "g.node.gt:005"
 
   g.node.forest:
-    latest_version: "000"
+    latest_version: "001"
     owner: gridworks-energy
     versioning_strategy: "literal"
     description: "A forest of Grid Node subtrees: the subtrees under one or more root aliases, carried as their current GNodes plus the connectivity edges wiring them together."
 
     versions:
-      "000":
-        schema_url: "https://schemas.electricity.works/types/g.node.forest/000"
-        created: "2026-07-03T18:55:00Z"
+      "001":
+        schema_url: "https://schemas.electricity.works/types/g.node.forest/001"
+        created: "2026-07-29T14:10:00Z"
         status: "published"
-        summary: "Initial Sema version"
+        summary: "- SendTimeMs: new optional sender-clock stamp (epoch ms) at forest assembly; the registry stamps wall-clock — it is never simulated (sender-time standard, first adopter)"
         direct_dependencies:
           structural:
             - "connectivity.edge.gt:000"
             - "g.node.gt:005"
             - "left.right.dot"
+            - "utc.milliseconds"
 
   g.node.forest.request:
     latest_version: "000"
