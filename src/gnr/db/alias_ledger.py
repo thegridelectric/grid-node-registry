@@ -9,7 +9,7 @@ transaction as the GNode write.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -53,7 +53,7 @@ def claim_alias(session: Session, alias: LeftRightDot, g_node_id: UUID4Str) -> N
         .values(
             alias=alias,
             g_node_id=g_node_id,
-            first_assigned_at=datetime.utcnow(),
+            first_assigned_at=datetime.now(UTC),
         )
         .on_conflict_do_nothing(index_elements=["alias"])
     )

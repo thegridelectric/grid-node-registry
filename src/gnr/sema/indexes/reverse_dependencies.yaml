@@ -5,12 +5,12 @@ types:
   connectivity.edge.gt:
     '000':
       used_by:
-      - g.node.forest:000
+      - g.node.forest:001
   g.node.gt:
     '005':
       used_by:
       - g.node.create.cmd:000
-      - g.node.forest:000
+      - g.node.forest:001
       - g.node.reparent.cmd:001
 enums:
   base.g.node.class:
@@ -26,8 +26,11 @@ formats:
   left.right.dot:
     used_by:
     - g.node.forest.request:000
-    - g.node.forest:000
+    - g.node.forest:001
     - g.node.gt:005
+  utc.milliseconds:
+    used_by:
+    - g.node.forest:001
   uuid4.str:
     used_by:
     - connectivity.edge.gt:000

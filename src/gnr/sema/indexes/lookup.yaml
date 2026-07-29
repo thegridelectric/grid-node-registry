@@ -30,10 +30,10 @@ types:
     versions:
       '000': definitions/types/g.node.create.cmd/000.yaml
   g.node.forest:
-    latest_version: '000'
+    latest_version: '001'
     versioning_strategy: literal
     versions:
-      '000': definitions/types/g.node.forest/000.yaml
+      '001': definitions/types/g.node.forest/001.yaml
   g.node.forest.request:
     latest_version: '000'
     versioning_strategy: literal
@@ -67,4 +67,5 @@ enums:
       '000': definitions/enums/g.node.status/000.yaml
 formats:
   left.right.dot: definitions/formats/left.right.dot.yaml
+  utc.milliseconds: definitions/formats/utc.milliseconds.yaml
   uuid4.str: definitions/formats/uuid4.str.yaml
