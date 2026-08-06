@@ -1,14 +1,13 @@
 {
   "TypeName": "g.node.create.cmd",
-  "Version": "000",
+  "Version": "001",
   "NewNode": {
     "TypeName": "g.node.gt",
-    "Version": "005",
+    "Version": "006",
     "GNodeId": "dcb05390-5bca-40ef-b63d-7908ccb33d9b",
     "Alias": "hw1.isone.me.versant.keene.beech",
     "BaseClass": "LeafTransactiveNode",
     "GNodeClass": "LeafTransactiveNode",
-    "Status": "Active",
-    "PositionPointId": "198ca6af-5a4b-43a2-a8a9-7546deabc731"
+    "Status": "Pending"
   }
 }

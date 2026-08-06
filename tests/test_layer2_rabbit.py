@@ -17,16 +17,15 @@ import uuid
 
 import pika
 import pytest
-from pydantic import SecretStr
-
 from gwbase import topology
 from gwbase.config import ServiceSettings
 from gwbase.config.rabbit_settings import RabbitBrokerClient
 from gwbase.orchestrator import Orchestrator
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
+from pydantic import SecretStr
 
 from gnr.db.authority import PostgresAuthority
-from gnr.dev_universe import DEV_POSITION, seed_dev_universe
+from gnr.dev_universe import DEV_POSITION_ID, seed_dev_universe
 from gnr.gnr_rabbit import GnrRabbit
 from gnr.sema.codec import default_codec
 from gnr.sema.enums import BaseGNodeClass, GNodeStatus
@@ -139,7 +138,7 @@ def test_reparent_over_real_broker(session_factory, rabbit_url):
             base_class=BaseGNodeClass.ConnectivityNode,
             g_node_class="ConnectivityNode",
             status=GNodeStatus.Active,
-            position_point_id=DEV_POSITION.id,
+            position_point_id=DEV_POSITION_ID,
             display_name="sub",
         )
         cmd = GNodeReparentCmd(

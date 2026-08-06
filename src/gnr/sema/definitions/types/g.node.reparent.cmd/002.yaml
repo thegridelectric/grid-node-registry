@@ -1,5 +1,5 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
-$id: "https://schemas.electricity.works/types/g.node.reparent.cmd/001"
+$id: "https://schemas.electricity.works/types/g.node.reparent.cmd/002"
 
 title: "g.node.reparent.cmd"
 type: object
@@ -12,7 +12,7 @@ description: >
 properties:
 
   NewNode:
-    $ref: "https://schemas.electricity.works/types/g.node.gt/005"
+    $ref: "https://schemas.electricity.works/types/g.node.gt/006"
     description: >
       The new GNode N being introduced. Its Alias places it in the topology;
       the named children re-parent beneath it.
@@ -36,7 +36,7 @@ properties:
     const: "g.node.reparent.cmd"
 
   Version:
-    const: "001"
+    const: "002"
 
 required:
   - NewNode
@@ -57,12 +57,12 @@ examples:
         "Status": "Active",
         "PositionPointId": "198ca6af-5a4b-43a2-a8a9-7546deabc731",
         "TypeName": "g.node.gt",
-        "Version": "005"
+        "Version": "006"
       },
       "MovedChildGNodeIds": ["dcb05390-5bca-40ef-b63d-7908ccb33d9b"],
       "Proof": "v0:9f2c1a7e4b8d",
       "TypeName": "g.node.reparent.cmd",
-      "Version": "001"
+      "Version": "002"
     }
 
 x-gridworks:

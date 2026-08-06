@@ -23,7 +23,7 @@ GT = GNodeGt(
     position_point_id="f3b26cbe-3567-4d38-a2f5-79c3b1e2c8a1",
     display_name="isone",
 )
-FOREST = GNodeForest(roots=[GT.alias], nodes=[GT], edges=[])
+FOREST = GNodeForest(roots=[GT.alias], nodes=[GT], edges=[], send_time_ms=1785971400000)
 
 
 class OneNodeSource:
@@ -73,8 +73,8 @@ def test_openapi_schemas_link_to_sema_definitions():
     spec = client.get("/openapi.json").json()
     schemas = spec["components"]["schemas"]
     for name, type_name, version in [
-        ("GNodeGt", "g.node.gt", "005"),
-        ("GNodeForest", "g.node.forest", "001"),
+        ("GNodeGt", "g.node.gt", "006"),
+        ("GNodeForest", "g.node.forest", "002"),
         ("GNodeForestRequest", "g.node.forest.request", "000"),
     ]:
         url = SEMA_DEFINITION_URL.format(type_name=type_name, version=version)

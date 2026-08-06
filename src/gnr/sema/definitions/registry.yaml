@@ -1,6 +1,6 @@
 metadata:
   registry_version: "1.0"
-  last_updated: "2026-07-29T15:45:00Z"
+  last_updated: "2026-08-06T14:35:00Z"
   maintainer: "gridworks-energy"
 
 formats:
@@ -99,37 +99,37 @@ types:
           structural: []
 
   g.node.create.cmd:
-    latest_version: "000"
+    latest_version: "001"
     owner: gridworks-energy
     versioning_strategy: "literal"
     description: "Command to create a single GNode in the Grid Node Registry: the registrar-facing write by which a node enters the registry, one node per command, parents first."
 
     versions:
-      "000":
-        schema_url: "https://schemas.electricity.works/types/g.node.create.cmd/000"
-        created: "2026-07-08T17:45:00Z"
+      "001":
+        schema_url: "https://schemas.electricity.works/types/g.node.create.cmd/001"
+        created: "2026-08-06T13:25:00Z"
         status: "published"
-        summary: "Initial Sema version"
+        summary: "- NewNode rebinds to g.node.gt:006; new axiom 1 LocationlessAtCreation (NewNode.PositionPointId SHALL be null — a location identity is registered after creation)"
         direct_dependencies:
           structural:
-            - "g.node.gt:005"
+            - "g.node.gt:006"
 
   g.node.forest:
-    latest_version: "001"
+    latest_version: "002"
     owner: gridworks-energy
     versioning_strategy: "literal"
     description: "A forest of Grid Node subtrees: the subtrees under one or more root aliases, carried as their current GNodes plus the connectivity edges wiring them together."
 
     versions:
-      "001":
-        schema_url: "https://schemas.electricity.works/types/g.node.forest/001"
-        created: "2026-07-29T14:10:00Z"
+      "002":
+        schema_url: "https://schemas.electricity.works/types/g.node.forest/002"
+        created: "2026-08-06T13:25:00Z"
         status: "published"
-        summary: "- SendTimeMs: new optional sender-clock stamp (epoch ms) at forest assembly; the registry stamps wall-clock — it is never simulated (sender-time standard, first adopter)"
+        summary: "- Nodes rebind to g.node.gt:006; SendTimeMs joins required"
         direct_dependencies:
           structural:
             - "connectivity.edge.gt:000"
-            - "g.node.gt:005"
+            - "g.node.gt:006"
             - "left.right.dot"
             - "utc.milliseconds"
 
@@ -151,17 +151,17 @@ types:
             - "uuid4.str"
 
   g.node.gt:
-    latest_version: "005"
+    latest_version: "006"
     owner: gridworks-energy
     versioning_strategy: "literal"
     description: "Fundamental identity object representing physical and logical grid nodes"
 
     versions:
-      "005":
-        schema_url: "https://schemas.electricity.works/types/g.node.gt/005"
-        created: "2026-07-03T18:55:00Z"
+      "006":
+        schema_url: "https://schemas.electricity.works/types/g.node.gt/006"
+        created: "2026-08-06T13:25:00Z"
         status: "published"
-        summary: "adds axiom 6 GNodeAliasHasBody; no field changes"
+        summary: "- Axiom 2 (PhysicalGNodeLocations) becomes activation-conditioned: PositionPointId is mandatory only when Status is Active — a Pending physical GNode may be locationless"
         direct_dependencies:
           structural:
             - "base.g.node.class:000"
@@ -170,20 +170,20 @@ types:
             - "uuid4.str"
 
   g.node.reparent.cmd:
-    latest_version: "001"
+    latest_version: "002"
     owner: gridworks-energy
     versioning_strategy: "literal"
     description: "Command to re-parent a subtree in the Grid Node Registry: introduce a new node N and re-parent one or more children beneath it."
 
     versions:
-      "001":
-        schema_url: "https://schemas.electricity.works/types/g.node.reparent.cmd/001"
-        created: "2026-07-21T12:50:00Z"
+      "002":
+        schema_url: "https://schemas.electricity.works/types/g.node.reparent.cmd/002"
+        created: "2026-08-06T13:25:00Z"
         status: "published"
-        summary: "- Proof: new optional opaque authorization artifact for this re-parent (format is machinery of the authority substrate, mirroring g.node.create.cmd)"
+        summary: "- NewNode rebinds to g.node.gt:006"
         direct_dependencies:
           structural:
-            - "g.node.gt:005"
+            - "g.node.gt:006"
             - "uuid4.str"
 
   position.point.gt:

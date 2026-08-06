@@ -67,7 +67,9 @@ def check_base_class_transition(old: BaseGNodeClass, new: BaseGNodeClass) -> Non
         return
     if new not in ALLOWED_BASE_CLASS_TRANSITIONS.get(old, frozenset()):
         allowed = ", ".join(
-            sorted(c.value for c in ALLOWED_BASE_CLASS_TRANSITIONS.get(old, frozenset()))
+            sorted(
+                c.value for c in ALLOWED_BASE_CLASS_TRANSITIONS.get(old, frozenset())
+            )
         )
         raise IllegalBaseClassTransition(
             f"base_class {old.value} cannot change to {new.value}; "

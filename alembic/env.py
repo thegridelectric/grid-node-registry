@@ -1,17 +1,18 @@
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
-from alembic import context
-
 # Add project root to sys.path
 from pathlib import Path
+
+from sqlalchemy import engine_from_config, pool
+
+from alembic import context
+
 root_path = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root_path))
 
-from gnr.settings import Settings
 from gnr.db.models import Base  # SQLAlchemy metadata
-
+from gnr.settings import Settings
 
 # -----------------------------------------------------------------------------
 # Alembic Config

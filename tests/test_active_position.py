@@ -5,19 +5,26 @@ GNodeSql}` map plus the set of `position_points` ids, so these are pure unit
 tests: an Active physical GNode (base_class ≠ Logical) must hold its
 PositionPoint row; Pending nodes and Logical nodes need none.
 """
+
 import uuid
 
-from gnr.sema.enums import BaseGNodeClass as B, GNodeStatus as S
 from gnr.db.models import GNodeSql
 from gnr.db.validate import check_active_physical_have_position
+from gnr.sema.enums import BaseGNodeClass as B
+from gnr.sema.enums import GNodeStatus as S
 
 POS_ID = str(uuid.uuid4())
 
 
 def node(alias, bc, status=S.Active, position_point_id=POS_ID):
-    return GNodeSql(id=str(uuid.uuid4()), alias=alias, base_class=bc,
-                    g_node_class=bc.value, status=status,
-                    position_point_id=position_point_id)
+    return GNodeSql(
+        id=str(uuid.uuid4()),
+        alias=alias,
+        base_class=bc,
+        g_node_class=bc.value,
+        status=status,
+        position_point_id=position_point_id,
+    )
 
 
 def tree(*nodes):
@@ -40,7 +47,9 @@ def test_active_physical_with_position_row_clean():
 
 def test_active_physical_without_position_row_flagged():
     # opaque id present but no position_points row behind it
-    orphan = node("d1.isone.keene", B.ConnectivityNode, position_point_id=str(uuid.uuid4()))
+    orphan = node(
+        "d1.isone.keene", B.ConnectivityNode, position_point_id=str(uuid.uuid4())
+    )
     assert flagged(check_active_physical_have_position(tree(orphan), {POS_ID}), orphan)
 
 
@@ -52,8 +61,12 @@ def test_active_physical_with_null_position_flagged():
 def test_pending_physical_without_position_clean():
     # the fleet-ingest posture: physical, positions staged, Pending until the
     # TaValidator work lands the positions and activates
-    pending = node("d1.isone.keene.beech.ta", B.TerminalAsset,
-                   status=S.Pending, position_point_id=None)
+    pending = node(
+        "d1.isone.keene.beech.ta",
+        B.TerminalAsset,
+        status=S.Pending,
+        position_point_id=None,
+    )
     assert check_active_physical_have_position(tree(pending), set()) == []
 
 

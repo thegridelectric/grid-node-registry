@@ -119,7 +119,9 @@ class GnrRabbit(Orchestrator):
         """
         self.broadcast_topology(self.authority.get_forest([root]), radio_channel=root)
 
-    def broadcast_topology(self, broadcast: GNodeForest, *, radio_channel: LeftRightDot) -> None:
+    def broadcast_topology(
+        self, broadcast: GNodeForest, *, radio_channel: LeftRightDot
+    ) -> None:
         """Publish the affected forest on the registry's mic exchange (best-effort),
         keyed on `radio_channel` — the audience-known alias of what changed (dots
         preserved: the channel is the multi-segment tail of the `rjb` key, which is
