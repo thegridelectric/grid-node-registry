@@ -1,5 +1,5 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
-$id: "https://schemas.electricity.works/types/g.node.forest/001"
+$id: "https://schemas.electricity.works/types/g.node.forest/002"
 
 title: "g.node.forest"
 type: object
@@ -23,7 +23,7 @@ properties:
   Nodes:
     type: array
     items:
-      $ref: "https://schemas.electricity.works/types/g.node.gt/005"
+      $ref: "https://schemas.electricity.works/types/g.node.gt/006"
     description: >
       The GNodes making up the subtrees, each in its current form (its
       current Alias). Immutable GNodeId identifies each node across renames.
@@ -40,11 +40,9 @@ properties:
     $ref: "https://schemas.electricity.works/formats/utc.milliseconds"
     description: >
       The sender's clock reading at the moment the forest is assembled for
-      sending (the sender-time standard). The registry always stamps
-      wall-clock: it is a notary and is never simulated, even when the fleet
-      it describes runs simulated time. A consumer projecting the forest MAY
-      use SendTimeMs to refuse letting an older assertion overwrite a newer
-      one.
+      sending (the sender-time standard). A consumer projecting the forest
+      MAY use SendTimeMs to refuse letting an older assertion overwrite a
+      newer one.
 
   Proof:
     type: string
@@ -55,12 +53,13 @@ properties:
     const: "g.node.forest"
 
   Version:
-    const: "001"
+    const: "002"
 
 required:
   - Roots
   - Nodes
   - Edges
+  - SendTimeMs
   - TypeName
   - Version
 
@@ -79,7 +78,7 @@ examples:
           "Status": "Active",
           "PositionPointId": "198ca6af-5a4b-43a2-a8a9-7546deabc731",
           "TypeName": "g.node.gt",
-          "Version": "005"
+          "Version": "006"
         }
       ],
       "Edges": [
@@ -94,7 +93,7 @@ examples:
       ],
       "SendTimeMs": 1785420600000,
       "TypeName": "g.node.forest",
-      "Version": "001"
+      "Version": "002"
     }
 
 x-gridworks:
@@ -110,12 +109,6 @@ x-gridworks:
     (rewritten when a subtree re-parents), whereas a GNodeId is immutable.
     The current alias of an endpoint is derived by looking up its GNodeId
     among the carried Nodes.
-
-    SendTimeMs is the first adoption of the sender-time standard: one
-    uniform, optional slot for time as the sender's clock understands it.
-    For most senders in a hybrid universe that clock may be simulated; the
-    registry's never is — notarization time is wall-clock even when the
-    fleet described runs simulated time.
 
     Proof is the distributed-authority seam. Today the registry's own
     signature over the message is the single authority for the forest's

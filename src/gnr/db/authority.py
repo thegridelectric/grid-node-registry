@@ -17,7 +17,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from gnr.db.alias_ledger import claim_alias
-from gnr.db.models import AliasAssignmentSql, CommandLogSql, ConnectivityEdgeSql, GNodeSql
+from gnr.db.models import (
+    AliasAssignmentSql,
+    CommandLogSql,
+    ConnectivityEdgeSql,
+    GNodeSql,
+)
 from gnr.db.session import SessionLocal
 from gnr.db.validate import is_forest_root, parent_alias, universe_of, validate_registry
 from gnr.ids import command_hash
@@ -55,6 +60,7 @@ class EdgeView:
 
 # ---- pure alias-rewrite logic (no DB — unit-testable) ----------------------
 
+
 def _send_time_ms() -> int:
     """The registry's clock at forest assembly (SendTimeMs, sender-time
     standard). Always wall-clock: the registry is a notary and is never
@@ -67,12 +73,16 @@ def in_subtree(alias: LeftRightDot, prefix: LeftRightDot) -> bool:
     return alias == prefix or alias.startswith(prefix + ".")
 
 
-def rewrite_alias(alias: LeftRightDot, old_prefix: LeftRightDot, new_prefix: LeftRightDot) -> LeftRightDot:
+def rewrite_alias(
+    alias: LeftRightDot, old_prefix: LeftRightDot, new_prefix: LeftRightDot
+) -> LeftRightDot:
     """Rewrite one materialized-path alias from `old_prefix` to `new_prefix`."""
-    return new_prefix + alias[len(old_prefix):]
+    return new_prefix + alias[len(old_prefix) :]
 
 
-def moved_child_new_prefix(new_node_alias: LeftRightDot, child_alias: LeftRightDot) -> LeftRightDot:
+def moved_child_new_prefix(
+    new_node_alias: LeftRightDot, child_alias: LeftRightDot
+) -> LeftRightDot:
     """The alias-prefix a moved child takes under the new node N (N.alias + child's last word)."""
     return f"{new_node_alias}.{child_alias.rsplit('.', 1)[-1]}"
 
@@ -207,7 +217,9 @@ class PostgresAuthority(AuthoritySource):
             claim = s.get(AliasAssignmentSql, alias)  # was it ever assigned?
             if claim is None:
                 return None
-            owner = s.get(GNodeSql, claim.g_node_id)  # the permanent owner, current form
+            owner = s.get(
+                GNodeSql, claim.g_node_id
+            )  # the permanent owner, current form
             return owner.to_gt() if owner is not None else None
 
     def get_forest(self, roots: list[LeftRightDot]) -> GNodeForest:
@@ -221,7 +233,9 @@ class PostgresAuthority(AuthoritySource):
                 # compare byte-identically), and row order is not.
                 for row in (
                     s.query(GNodeSql)
-                    .filter((GNodeSql.alias == root) | (GNodeSql.alias.like(root + ".%")))
+                    .filter(
+                        (GNodeSql.alias == root) | (GNodeSql.alias.like(root + ".%"))
+                    )
                     .order_by(GNodeSql.alias)
                     .all()
                 ):
@@ -306,9 +320,13 @@ class PostgresAuthority(AuthoritySource):
             violations = validate_registry(s, self._universe)
             if violations:
                 raise CreateError(f"create would violate invariants: {violations}")
-            s.add(CommandLogSql(
-                command_hash=chash, type_name=cmd.type_name, payload=payload.decode()
-            ))
+            s.add(
+                CommandLogSql(
+                    command_hash=chash,
+                    type_name=cmd.type_name,
+                    payload=payload.decode(),
+                )
+            )
             broadcast = GNodeForest(
                 roots=[node.alias],
                 nodes=[s.get(GNodeSql, node.g_node_id).to_gt()],
@@ -345,11 +363,15 @@ class PostgresAuthority(AuthoritySource):
                     f"this registry serves {self._universe!r}"
                 )
             if is_forest_root(n.alias):
-                raise ReparentError(f"new node {n.alias!r} is a forest root; nothing to re-parent under")
+                raise ReparentError(
+                    f"new node {n.alias!r} is a forest root; nothing to re-parent under"
+                )
             e_alias = parent_alias(n.alias)
             e = s.query(GNodeSql).filter_by(alias=e_alias).one_or_none()
             if e is None:
-                raise ReparentError(f"parent {e_alias!r} of new node {n.alias!r} not found")
+                raise ReparentError(
+                    f"parent {e_alias!r} of new node {n.alias!r} not found"
+                )
 
             # Alias-collision PRE-CHECK: the rewrite generates new aliases; if any
             # is permanently owned by a DIFFERENT GNodeId (uniqueness-through-time),
@@ -363,8 +385,10 @@ class PostgresAuthority(AuthoritySource):
                 new_prefix = moved_child_new_prefix(n.alias, child.alias)
                 for row in (
                     s.query(GNodeSql)
-                    .filter((GNodeSql.alias == child.alias)
-                            | (GNodeSql.alias.like(child.alias + ".%")))
+                    .filter(
+                        (GNodeSql.alias == child.alias)
+                        | (GNodeSql.alias.like(child.alias + ".%"))
+                    )
                     .all()
                 ):
                     intended[rewrite_alias(row.alias, child.alias, new_prefix)] = row.id
@@ -419,7 +443,13 @@ class PostgresAuthority(AuthoritySource):
             )
             # Append the applied command to the log (the primitive; state is a
             # projection). Same transaction as the state change.
-            s.add(CommandLogSql(command_hash=chash, type_name=cmd.type_name, payload=payload.decode()))
+            s.add(
+                CommandLogSql(
+                    command_hash=chash,
+                    type_name=cmd.type_name,
+                    payload=payload.decode(),
+                )
+            )
             s.commit()
         return broadcast
 

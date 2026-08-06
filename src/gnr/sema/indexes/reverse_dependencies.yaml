@@ -5,36 +5,36 @@ types:
   connectivity.edge.gt:
     '000':
       used_by:
-      - g.node.forest:001
+      - g.node.forest:002
   g.node.gt:
-    '005':
+    '006':
       used_by:
-      - g.node.create.cmd:000
-      - g.node.forest:001
-      - g.node.reparent.cmd:001
+      - g.node.create.cmd:001
+      - g.node.forest:002
+      - g.node.reparent.cmd:002
 enums:
   base.g.node.class:
     '000':
       used_by:
-      - g.node.gt:005
+      - g.node.gt:006
   g.node.status:
     '000':
       used_by:
       - connectivity.edge.gt:000
-      - g.node.gt:005
+      - g.node.gt:006
 formats:
   left.right.dot:
     used_by:
     - g.node.forest.request:000
-    - g.node.forest:001
-    - g.node.gt:005
+    - g.node.forest:002
+    - g.node.gt:006
   utc.milliseconds:
     used_by:
-    - g.node.forest:001
+    - g.node.forest:002
   uuid4.str:
     used_by:
     - connectivity.edge.gt:000
     - g.node.forest.request:000
-    - g.node.gt:005
-    - g.node.reparent.cmd:001
+    - g.node.gt:006
+    - g.node.reparent.cmd:002
     - position.point.gt:000

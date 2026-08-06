@@ -23,7 +23,7 @@ types:
       types: []
       versionless_types: []
   g.node.create.cmd:
-    '000':
+    '001':
       enums:
       - base.g.node.class:000
       - g.node.status:000
@@ -31,10 +31,10 @@ types:
       - left.right.dot
       - uuid4.str
       types:
-      - g.node.gt:005
+      - g.node.gt:006
       versionless_types: []
   g.node.forest:
-    '001':
+    '002':
       enums:
       - base.g.node.class:000
       - g.node.status:000
@@ -44,7 +44,7 @@ types:
       - uuid4.str
       types:
       - connectivity.edge.gt:000
-      - g.node.gt:005
+      - g.node.gt:006
       versionless_types: []
   g.node.forest.request:
     '000':
@@ -55,7 +55,7 @@ types:
       types: []
       versionless_types: []
   g.node.gt:
-    '005':
+    '006':
       enums:
       - base.g.node.class:000
       - g.node.status:000
@@ -65,7 +65,7 @@ types:
       types: []
       versionless_types: []
   g.node.reparent.cmd:
-    '001':
+    '002':
       enums:
       - base.g.node.class:000
       - g.node.status:000
@@ -73,7 +73,7 @@ types:
       - left.right.dot
       - uuid4.str
       types:
-      - g.node.gt:005
+      - g.node.gt:006
       versionless_types: []
   position.point.gt:
     '000':

@@ -14,11 +14,17 @@ from __future__ import annotations
 import uuid
 
 import pytest
+from pydantic import ValidationError
 
 from gnr.db.authority import CreateError, PostgresAuthority, ReparentError
-from gnr.db.models import AliasAssignmentSql, CommandLogSql, ConnectivityEdgeSql, GNodeSql
+from gnr.db.models import (
+    AliasAssignmentSql,
+    CommandLogSql,
+    ConnectivityEdgeSql,
+    GNodeSql,
+)
 from gnr.db.validate import validate_registry
-from gnr.dev_universe import DEV_POSITION, DEV_UNIVERSE, seed_dev_universe
+from gnr.dev_universe import DEV_POSITION_ID, DEV_UNIVERSE, seed_dev_universe
 from gnr.ids import command_hash, edge_id
 from gnr.sema.enums import BaseGNodeClass, GNodeStatus
 from gnr.sema.types import GNodeCreateCmd, GNodeGt, GNodeReparentCmd
@@ -42,7 +48,7 @@ def _new_cn():
         base_class=BaseGNodeClass.ConnectivityNode,
         g_node_class="ConnectivityNode",
         status=GNodeStatus.Active,
-        position_point_id=DEV_POSITION.id,
+        position_point_id=DEV_POSITION_ID,
         display_name="sub",
     )
 
@@ -88,7 +94,7 @@ def test_reparent_rewrites_subtree(seeded, session_factory):
         base_class=BaseGNodeClass.ConnectivityNode,
         g_node_class="ConnectivityNode",
         status=GNodeStatus.Active,
-        position_point_id=DEV_POSITION.id,
+        position_point_id=DEV_POSITION_ID,
         display_name="sub",
     )
     cmd = GNodeReparentCmd(
@@ -148,7 +154,7 @@ def test_reparent_self_collision_aborts(seeded, session_factory):
             base_class=BaseGNodeClass.LeafTransactiveNode,
             g_node_class="LeafTransactiveNode",
             status=GNodeStatus.PermanentlyDeactivated,
-            position_point_id=DEV_POSITION.id,
+            position_point_id=DEV_POSITION_ID,
             display_name="squatter",
         )
         from gnr.db.alias_ledger import claim_alias
@@ -165,10 +171,12 @@ def test_reparent_self_collision_aborts(seeded, session_factory):
         base_class=BaseGNodeClass.ConnectivityNode,
         g_node_class="ConnectivityNode",
         status=GNodeStatus.Active,
-        position_point_id=DEV_POSITION.id,
+        position_point_id=DEV_POSITION_ID,
         display_name="sub",
     )
-    cmd = GNodeReparentCmd(new_node=new_cn, moved_child_g_node_ids=[beech_ltn.g_node_id])
+    cmd = GNodeReparentCmd(
+        new_node=new_cn, moved_child_g_node_ids=[beech_ltn.g_node_id]
+    )
 
     # The PRE-CHECK fails up front with an explicit collision error naming the
     # alias — not a raw ledger abort mid-rewrite.
@@ -190,7 +198,9 @@ def test_reparent_command_logged(seeded, session_factory):
     content-addressed command log in the same transaction."""
     auth = _authority(session_factory)
     beech_ltn = seeded[BEECH_LTN]
-    cmd = GNodeReparentCmd(new_node=_new_cn(), moved_child_g_node_ids=[beech_ltn.g_node_id])
+    cmd = GNodeReparentCmd(
+        new_node=_new_cn(), moved_child_g_node_ids=[beech_ltn.g_node_id]
+    )
 
     auth.apply_reparent(cmd)
 
@@ -206,7 +216,9 @@ def test_reparent_replay_idempotent(seeded, session_factory):
     it can't distinguish from a rejection)."""
     auth = _authority(session_factory)
     beech_ltn = seeded[BEECH_LTN]
-    cmd = GNodeReparentCmd(new_node=_new_cn(), moved_child_g_node_ids=[beech_ltn.g_node_id])
+    cmd = GNodeReparentCmd(
+        new_node=_new_cn(), moved_child_g_node_ids=[beech_ltn.g_node_id]
+    )
 
     first = auth.apply_reparent(cmd)
     replay = auth.apply_reparent(cmd)  # e.g. an at-least-once retry after a timeout
@@ -223,13 +235,15 @@ def test_reparent_replay_idempotent(seeded, session_factory):
 
 
 def _new_home_cn(alias: str) -> GNodeGt:
+    # The shape a create command may carry: Pending, locationless
+    # (pending-first — g.node.create.cmd/001 axiom 1).
     return GNodeGt(
         g_node_id=str(uuid.uuid4()),
         alias=alias,
         base_class=BaseGNodeClass.ConnectivityNode,
         g_node_class="ConnectivityNode",
-        status=GNodeStatus.Active,
-        position_point_id=DEV_POSITION.id,
+        status=GNodeStatus.Pending,
+        position_point_id=None,
         display_name=alias.rsplit(".", 1)[-1],
     )
 
@@ -283,16 +297,18 @@ def test_create_rejects_recycled_alias(seeded, session_factory):
     auth = _authority(session_factory)
     beech_ltn = seeded[BEECH_LTN]
     # Move beech away so its old alias is vacated (live-unique would allow reuse).
-    auth.apply_reparent(GNodeReparentCmd(
-        new_node=_new_cn(), moved_child_g_node_ids=[beech_ltn.g_node_id],
-    ))
+    auth.apply_reparent(
+        GNodeReparentCmd(
+            new_node=_new_cn(),
+            moved_child_g_node_ids=[beech_ltn.g_node_id],
+        )
+    )
     pretender = GNodeGt(
         g_node_id=str(uuid.uuid4()),
         alias=BEECH_LTN,
         base_class=BaseGNodeClass.LeafTransactiveNode,
         g_node_class="LeafTransactiveNode",
-        status=GNodeStatus.Active,
-        position_point_id=DEV_POSITION.id,
+        status=GNodeStatus.Pending,
         display_name="pretender",
     )
     with pytest.raises(CreateError, match="permanently owned"):
@@ -310,20 +326,26 @@ def test_loop_enters_as_non_tree_edge(seeded, session_factory):
     beech = seeded[BEECH_LTN]
     elm = seeded[ELM_LTN]
     with session_factory() as s:
-        s.add(ConnectivityEdgeSql(
-            id=edge_id(beech.g_node_id, elm.g_node_id),
-            from_g_node_id=beech.g_node_id,
-            to_g_node_id=elm.g_node_id,
-            status=GNodeStatus.Active,
-        ))
+        s.add(
+            ConnectivityEdgeSql(
+                id=edge_id(beech.g_node_id, elm.g_node_id),
+                from_g_node_id=beech.g_node_id,
+                to_g_node_id=elm.g_node_id,
+                status=GNodeStatus.Active,
+            )
+        )
         s.commit()
         # A non-tree edge is first-class: the registry stays valid.
         assert validate_registry(s, DEV_UNIVERSE) == []
 
     auth = _authority(session_factory)
     # It is visible from both endpoints…
-    assert [e.to_g_node_id for e in auth.fetch_edges(beech.g_node_id).children] == [elm.g_node_id]
-    assert [e.from_g_node_id for e in auth.fetch_edges(elm.g_node_id).parents] == [beech.g_node_id]
+    assert [e.to_g_node_id for e in auth.fetch_edges(beech.g_node_id).children] == [
+        elm.g_node_id
+    ]
+    assert [e.from_g_node_id for e in auth.fetch_edges(elm.g_node_id).parents] == [
+        beech.g_node_id
+    ]
     # …and rides any forest that contains both endpoints.
     forest = auth.get_forest([KEENE])
     assert len(forest.edges) == 1
@@ -336,12 +358,14 @@ def test_stored_tree_edge_is_rejected(seeded, session_factory):
     keene = seeded[KEENE]
     beech = seeded[BEECH_LTN]
     with session_factory() as s:
-        s.add(ConnectivityEdgeSql(
-            id=edge_id(keene.g_node_id, beech.g_node_id),
-            from_g_node_id=keene.g_node_id,
-            to_g_node_id=beech.g_node_id,
-            status=GNodeStatus.Active,
-        ))
+        s.add(
+            ConnectivityEdgeSql(
+                id=edge_id(keene.g_node_id, beech.g_node_id),
+                from_g_node_id=keene.g_node_id,
+                to_g_node_id=beech.g_node_id,
+                status=GNodeStatus.Active,
+            )
+        )
         s.commit()
         violations = validate_registry(s, DEV_UNIVERSE)
         assert len(violations) == 1
@@ -356,41 +380,49 @@ def test_create_pending_fleet_parents_first(seeded, session_factory):
     parent-closed-active invariant."""
     auth = _authority(session_factory)
 
-    def pending_cn(alias: str) -> GNodeGt:
-        node = _new_home_cn(alias)
-        return node.model_copy(update={"status": GNodeStatus.Pending})
-
-    parent = pending_cn(f"{KEENE}.pfx")
-    child = pending_cn(f"{KEENE}.pfx.sub")
+    parent = _new_home_cn(f"{KEENE}.pfx")
+    child = _new_home_cn(f"{KEENE}.pfx.sub")
     auth.apply_create(GNodeCreateCmd(new_node=parent))
     auth.apply_create(GNodeCreateCmd(new_node=child))
     assert auth.get_by_alias(child.alias).status == GNodeStatus.Pending
     with session_factory() as s:
         assert validate_registry(s, DEV_UNIVERSE) == []
 
-    eager = _new_home_cn(f"{KEENE}.pfx.eager")  # Active under a Pending parent
+    # An Active child under a Pending parent. Logical, because an Active
+    # PHYSICAL node can no longer enter via create at all: the command may
+    # not carry a position id (create.cmd/001 axiom 1) and Active-physical
+    # requires one (g.node.gt/006 axiom 2).
+    eager = GNodeGt(
+        g_node_id=str(uuid.uuid4()),
+        alias=f"{KEENE}.pfx.eager",
+        base_class=BaseGNodeClass.Logical,
+        g_node_class="MonitorService",
+        status=GNodeStatus.Active,
+        display_name="eager",
+    )
     with pytest.raises(CreateError, match="parent_closed_active"):
         auth.apply_create(GNodeCreateCmd(new_node=eager))
 
 
-def test_create_active_physical_without_position_rejected(seeded, session_factory):
-    """The write guardrail for Active-physical-requires-PositionPoint: an
-    Active physical GNode whose position_point_id has no `position_points` row
-    bounces, and the whole transaction rolls back (no node row, no ledger
-    claim). The same alias then lands as Pending with an opaque position id —
-    the fleet-ingest posture (activation arrives with the TaValidator
-    positions)."""
-    auth = _authority(session_factory)
-    alias = f"{KEENE}.sub8"
-    ghost = _new_home_cn(alias).model_copy(
-        update={"position_point_id": str(uuid.uuid4())}  # opaque id, no row
-    )
-    with pytest.raises(CreateError, match="active_position"):
-        auth.apply_create(GNodeCreateCmd(new_node=ghost))
-    with session_factory() as s:
-        assert s.query(GNodeSql).filter_by(alias=alias).count() == 0
-        assert s.get(AliasAssignmentSql, alias) is None
+def test_create_active_physical_without_position_rejected(seeded):
+    """Active-physical-requires-PositionPoint is now unrepresentable at the
+    boundary, in both directions: an Active physical GNode without a position
+    point fails g.node.gt/006 axiom 2 at construction, and a create command
+    carrying ANY position id fails g.node.create.cmd/001 axiom 1 — a location
+    identity is registered after creation, never carried in."""
+    with pytest.raises(ValidationError, match="Axiom 2"):
+        GNodeGt(
+            g_node_id=str(uuid.uuid4()),
+            alias=f"{KEENE}.sub8",
+            base_class=BaseGNodeClass.ConnectivityNode,
+            g_node_class="ConnectivityNode",
+            status=GNodeStatus.Active,
+            position_point_id=None,
+            display_name="sub8",
+        )
 
-    pending = ghost.model_copy(update={"status": GNodeStatus.Pending})
-    forest = auth.apply_create(GNodeCreateCmd(new_node=pending))
-    assert [g.alias for g in forest.nodes] == [alias]
+    carried = _new_home_cn(f"{KEENE}.sub8").model_copy(
+        update={"position_point_id": str(uuid.uuid4())}
+    )
+    with pytest.raises(ValidationError, match="Axiom 1"):
+        GNodeCreateCmd(new_node=carried)

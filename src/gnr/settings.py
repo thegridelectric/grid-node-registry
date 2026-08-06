@@ -18,9 +18,7 @@ class Settings(BaseSettings):
     # *Universes*) and the deployer must declare it. Every alias the registry
     # holds or accepts must carry this as its first dotted segment.
     universe: str
-    db_url: SecretStr = SecretStr(
-        "postgresql+psycopg://gnr:gnrpass@localhost:5435/gnr"
-    )
+    db_url: SecretStr = SecretStr("postgresql+psycopg://gnr:gnrpass@localhost:5435/gnr")
     db_echo: bool = False
     # Stop-gap write authorization until mTLS+FIS: when set, every write
     # command (create / re-parent) must carry a Proof whose sha256 hex equals
@@ -52,7 +50,7 @@ class Settings(BaseSettings):
             raise ValueError(
                 "a production-universe registry cannot boot yet — still stubs: "
                 + "; ".join(PROD_STUBS)
-                + ". See wiki/grid-node-registry (populate-and-deploy spoke)."
+                + "."
             )
         return v
 

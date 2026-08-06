@@ -17,11 +17,11 @@ import time
 import uuid
 
 import pytest
-from pydantic import SecretStr
-
 from gwbase import Orchestrator, ServiceSettings
 from gwbase.config.rabbit_settings import RabbitBrokerClient
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
+from pydantic import SecretStr
+from test_layer2_rabbit import provision_topology
 
 from gnr.db.authority import PostgresAuthority
 from gnr.db.models import (
@@ -33,10 +33,9 @@ from gnr.db.models import (
 )
 from gnr.gnr_rabbit import GnrRabbit
 from gnr.ids import command_hash
-from gnr.sema.enums import BaseGNodeClass as B, GNodeStatus as S
+from gnr.sema.enums import BaseGNodeClass as B
+from gnr.sema.enums import GNodeStatus as S
 from gnr.sema.types import GNodeCreateCmd, GNodeGt
-
-from test_layer2_rabbit import provision_topology
 
 pytestmark = pytest.mark.integration
 
@@ -46,8 +45,11 @@ REGISTRY_ALIAS = "d1.gnr"
 def _wipe(session_factory):
     with session_factory() as s:
         for table in (
-            ConnectivityEdgeSql, AliasAssignmentSql, GNodeSql,
-            PositionPointSql, CommandLogSql,
+            ConnectivityEdgeSql,
+            AliasAssignmentSql,
+            GNodeSql,
+            PositionPointSql,
+            CommandLogSql,
         ):
             s.query(table).delete(synchronize_session=False)
         s.commit()
@@ -64,9 +66,12 @@ def _wait_for(predicate, timeout_s: float, message: str) -> None:
 
 def _pending_cn(alias: str) -> GNodeGt:
     return GNodeGt(
-        g_node_id=str(uuid.uuid4()), alias=alias,
-        base_class=B.ConnectivityNode, g_node_class="ConnectivityNode",
-        status=S.Pending, position_point_id=str(uuid.uuid4()),
+        g_node_id=str(uuid.uuid4()),
+        alias=alias,
+        base_class=B.ConnectivityNode,
+        g_node_class="ConnectivityNode",
+        status=S.Pending,
+        position_point_id=None,
         display_name=alias.rsplit(".", 1)[-1],
     )
 
@@ -130,12 +135,17 @@ def test_nack_with_reason_then_ack_on_same_connection(session_factory, rabbit_ur
 
         # The loop SURVIVED the refusal: the same registry instance, same
         # connection, applies the next valid command and acks it.
-        root = GNodeCreateCmd(new_node=GNodeGt(
-            g_node_id=str(uuid.uuid4()), alias="d1.isone",
-            base_class=B.MarketMaker, g_node_class="MarketMaker",
-            status=S.Pending, position_point_id=str(uuid.uuid4()),
-            display_name="isone",
-        ))
+        root = GNodeCreateCmd(
+            new_node=GNodeGt(
+                g_node_id=str(uuid.uuid4()),
+                alias="d1.isone",
+                base_class=B.MarketMaker,
+                g_node_class="MarketMaker",
+                status=S.Pending,
+                position_point_id=None,
+                display_name="isone",
+            )
+        )
         root_hash = command_hash(root.to_bytes())
         mm.publish(root)
         _wait_for(lambda: root_hash in mm.verdicts, 15, "ack received")
