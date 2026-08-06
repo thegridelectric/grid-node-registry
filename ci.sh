@@ -1,6 +1,6 @@
 #!/bin/bash
-# Run locally everything CI runs, so a push won't go red (lint + format +
-# tests). Usage: ./ci.sh
+# Run locally everything CI runs, so a push won't go red. Mirrors
+# .github/workflows/tests.yml (lint + tests jobs). Usage: ./ci.sh
 set -euo pipefail
 
 step() { printf '\n=== %s ===\n' "$1"; shift; "$@"; }
