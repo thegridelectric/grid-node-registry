@@ -8,26 +8,25 @@ Sema types are used for validation (via the codec) before any insert/update.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Optional
 
 from sqlalchemy import (
-    String,
-    Enum,
     DateTime,
+    Enum,
     ForeignKey,
+    LargeBinary,
+    String,
     UniqueConstraint,
 )
 from sqlalchemy.orm import (
     Mapped,
-    mapped_column,
     declarative_base,
+    mapped_column,
 )
 
-from gnr.sema.enums import GNodeStatus, BaseGNodeClass
+from gnr.sema.enums import BaseGNodeClass, GNodeStatus
 from gnr.sema.types import (
-    GNodeGt,
     ConnectivityEdgeGt,
-    PositionPointGt,
+    GNodeGt,
 )
 
 Base = declarative_base()
@@ -37,45 +36,41 @@ Base = declarative_base()
 #  POSITION POINTS
 # ============================================================
 
+
 class PositionPointSql(Base):
+    """A GNode location: the identity row plus its encrypted coordinate payload.
+
+    A row exists iff a location identity has been registered against a GNode.
+    The coordinate payload is asymmetric ciphertext — the registry holds no
+    private key — and stays NULL until the validator registration flow
+    populates it. Plaintext coordinates are never stored, and the ciphertext
+    never rides the message bus (the immutable bus archives would defeat key
+    rotation); it arrives only over the authenticated registration surface.
+    """
+
     __tablename__ = "position_points"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    latitude_micro_deg: Mapped[int] = mapped_column()
-    longitude_micro_deg: Mapped[int] = mapped_column()
+    ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    key_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    alg: Mapped[str | None] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
-
-    def to_gt(self) -> PositionPointGt:
-        """Serialize database row → Sema GT."""
-        return PositionPointGt(
-            id=self.id,
-            latitude_micro_deg=self.latitude_micro_deg,
-            longitude_micro_deg=self.longitude_micro_deg,
-        )
-
-    @staticmethod
-    def from_gt(gt: PositionPointGt) -> "PositionPointSql":
-        """Create SQL row from Sema GT after full Sema validation."""
-        return PositionPointSql(
-            id=gt.id,
-            latitude_micro_deg=gt.latitude_micro_deg,
-            longitude_micro_deg=gt.longitude_micro_deg,
-        )
 
 
 # ============================================================
 #  G N O D E S
 # ============================================================
 
+
 class GNodeSql(Base):
     __tablename__ = "g_nodes"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     alias: Mapped[str] = mapped_column(String, index=True, unique=True)
-    prev_alias: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    prev_alias: Mapped[str | None] = mapped_column(String, nullable=True)
 
     base_class: Mapped[BaseGNodeClass] = mapped_column(
         Enum(BaseGNodeClass, name="base_g_node_class")
@@ -83,18 +78,18 @@ class GNodeSql(Base):
 
     g_node_class: Mapped[str] = mapped_column(String)
 
-    status: Mapped[GNodeStatus] = mapped_column(
-        Enum(GNodeStatus, name="g_node_status")
+    status: Mapped[GNodeStatus] = mapped_column(Enum(GNodeStatus, name="g_node_status"))
+
+    # The GNode's location identity. NULL until a location is registered
+    # against the node (creation is always locationless — g.node.create.cmd/001
+    # axiom 1); non-null always references a position_points row. Composed with
+    # g.node.gt/006 axiom 2, an Active physical node therefore always holds a
+    # registered location.
+    position_point_id: Mapped[str | None] = mapped_column(
+        ForeignKey("position_points.id"), nullable=True
     )
 
-    # An opaque location IDENTITY (a UUID), carried in the g.node.gt/command — NOT
-    # an enforced FK. The coordinate DATA is owned + populated later (encrypted) by
-    # a separate system (TaValidator), so an FK from here into a table gnr
-    # write-only-populates-later is the wrong coupling. gnr owns identity + topology;
-    # the (encrypted) geography lives elsewhere. See the positions-staging exploration.
-    position_point_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-
-    display_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
@@ -118,7 +113,7 @@ class GNodeSql(Base):
         )
 
     @staticmethod
-    def from_gt(gt: GNodeGt) -> "GNodeSql":
+    def from_gt(gt: GNodeGt) -> GNodeSql:
         """Create SQL model from an Sema GT instance (already validated)."""
         return GNodeSql(
             id=gt.g_node_id,
@@ -136,17 +131,14 @@ class GNodeSql(Base):
 #  CONNECTIVITY EDGES
 # ============================================================
 
+
 class ConnectivityEdgeSql(Base):
     __tablename__ = "connectivity_edges"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
 
-    from_g_node_id: Mapped[str] = mapped_column(
-        ForeignKey("g_nodes.id"), index=True
-    )
-    to_g_node_id: Mapped[str] = mapped_column(
-        ForeignKey("g_nodes.id"), index=True
-    )
+    from_g_node_id: Mapped[str] = mapped_column(ForeignKey("g_nodes.id"), index=True)
+    to_g_node_id: Mapped[str] = mapped_column(ForeignKey("g_nodes.id"), index=True)
 
     status: Mapped[GNodeStatus] = mapped_column(
         Enum(GNodeStatus, name="connectivity_edge_status")
@@ -158,8 +150,7 @@ class ConnectivityEdgeSql(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "from_g_node_id", "to_g_node_id",
-            name="uq_connectivity_edges_from_to"
+            "from_g_node_id", "to_g_node_id", name="uq_connectivity_edges_from_to"
         ),
     )
 
@@ -176,7 +167,7 @@ class ConnectivityEdgeSql(Base):
         )
 
     @staticmethod
-    def from_gt(gt: ConnectivityEdgeGt) -> "ConnectivityEdgeSql":
+    def from_gt(gt: ConnectivityEdgeGt) -> ConnectivityEdgeSql:
         return ConnectivityEdgeSql(
             id=gt.id,
             from_g_node_id=gt.from_g_node_id,
@@ -188,6 +179,7 @@ class ConnectivityEdgeSql(Base):
 # ============================================================
 #  ALIAS ASSIGNMENT LEDGER
 # ============================================================
+
 
 class AliasAssignmentSql(Base):
     """Append-only record of alias→GNodeId ownership, for all time.
@@ -214,6 +206,7 @@ class AliasAssignmentSql(Base):
 # ============================================================
 #  COMMAND LOG  (append-only; the chain-ready primitive)
 # ============================================================
+
 
 class CommandLogSql(Base):
     """Append-only log of applied mutation commands — the source-of-truth primitive.

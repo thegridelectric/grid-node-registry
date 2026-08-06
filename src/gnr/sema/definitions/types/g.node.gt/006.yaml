@@ -1,5 +1,5 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
-$id: "https://schemas.electricity.works/types/g.node.gt/005"
+$id: "https://schemas.electricity.works/types/g.node.gt/006"
 
 title: "g.node.gt"
 type: object
@@ -52,9 +52,9 @@ properties:
   PositionPointId:
     $ref: "https://schemas.electricity.works/formats/uuid4.str"
     description: >
-      Reference to a PositionPoint GT type giving physical location
-      (WGS84 microdegrees). Required for physical GNodes; null for
-      logical/service nodes.
+      Reference to the GNode's location identity (a position point). Null
+      until a location is registered; an Active physical GNode SHALL carry
+      one (axiom 2). Always null for logical/service nodes.
 
   DisplayName:
     type: "string"
@@ -65,7 +65,7 @@ properties:
     const: "g.node.gt"
 
   Version:
-    const: "005"
+    const: "006"
 
 required:
   - GNodeId
@@ -89,7 +89,7 @@ examples:
       "PositionPointId": "198ca6af-5a4b-43a2-a8a9-7546deabc731",
       "DisplayName": "Beech Street Meter",
       "TypeName": "g.node.gt",
-      "Version": "005"
+      "Version": "006"
     }
   - |
     {
@@ -100,7 +100,17 @@ examples:
       "Status": "Active",
       "DisplayName": "New England Weather Forecast Service",
       "TypeName": "g.node.gt",
-      "Version": "005"
+      "Version": "006"
+    }
+  - |
+    {
+      "GNodeId": "8c1f2b6e-4d0a-4c7f-9b3e-2a5d6e7f8a90",
+      "Alias": "d1.isone.me.versant.keene.willow",
+      "BaseClass": "LeafTransactiveNode",
+      "GNodeClass": "LeafTransactiveNode",
+      "Status": "Pending",
+      "TypeName": "g.node.gt",
+      "Version": "006"
     }
 
 x-gridworks:
@@ -117,7 +127,8 @@ x-gridworks:
     - number: 2
       name: "PhysicalGNodeLocations"
       statement: >
-        If BaseClass != Logical, PositionPointId SHALL NOT be null.
+        If Status is Active and BaseClass != Logical, PositionPointId SHALL
+        NOT be null.
 
     - number: 3
       name: "AliasTransitionConsistency"
@@ -167,6 +178,14 @@ x-gridworks:
     allows optimal power flow (OPF), market clearing, and constraint
     coordination mechanisms to operate centrally, regionally, or in
     distributed configurations without altering the underlying identity model.
+
+    Axiom 2 conditions location on Active, which composes with
+    g.node.create.cmd/001 (creation SHALL NOT carry a PositionPointId)
+    into a certificate-of-occupancy rule: a physical GNode cannot become
+    Active without holding its position point, and it can hold one while
+    still Pending. Location registration and activation are separate acts
+    on separate planes, so a rule forbidding a located Pending node would
+    make activation impossible.
 
     Conceptually, GNode aligns with node abstractions in IEC 61970/61968
     CIM (e.g., ConnectivityNode and TopologicalNode), while unifying

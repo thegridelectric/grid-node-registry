@@ -30,7 +30,6 @@ from gnr.sema.property_format import LeftRightDot, UUID4Str
 from gnr.sema.types import GNodeForest, GNodeForestRequest, GNodeGt
 from gnr.settings import Settings
 
-
 # Where a sema word's definition lives — one constant so the whole docs
 # surface flips together when schemas.electricity.works stands up.
 SEMA_DEFINITION_URL = (
@@ -80,7 +79,9 @@ def create_app(authority: AuthoritySource | None = None) -> FastAPI:
         """A single GNode by its immutable GNodeId (404 if unknown)."""
         gt = source.get_by_id(g_node_id)
         if gt is None:
-            raise HTTPException(status_code=404, detail=f"no GNode with id {g_node_id!r}")
+            raise HTTPException(
+                status_code=404, detail=f"no GNode with id {g_node_id!r}"
+            )
         return gt
 
     @app.get("/gnr/g-node-by-alias/{alias}", response_model_exclude_none=True)
@@ -91,7 +92,9 @@ def create_app(authority: AuthoritySource | None = None) -> FastAPI:
         never assigned."""
         gt = source.resolve_alias(alias)
         if gt is None:
-            raise HTTPException(status_code=404, detail=f"alias {alias!r} was never assigned")
+            raise HTTPException(
+                status_code=404, detail=f"alias {alias!r} was never assigned"
+            )
         return gt
 
     def openapi_with_sema_links() -> dict:
@@ -114,7 +117,9 @@ def create_app(authority: AuthoritySource | None = None) -> FastAPI:
                 url = SEMA_DEFINITION_URL.format(type_name=tn, version=ver)
                 note = f"Sema word [`{tn}` v{ver}]({url})."
                 comp["description"] = (
-                    f"{comp['description']}\n\n{note}" if comp.get("description") else note
+                    f"{comp['description']}\n\n{note}"
+                    if comp.get("description")
+                    else note
                 )
         app.openapi_schema = schema
         return app.openapi_schema

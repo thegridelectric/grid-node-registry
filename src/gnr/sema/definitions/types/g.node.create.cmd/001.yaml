@@ -1,5 +1,5 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
-$id: "https://schemas.electricity.works/types/g.node.create.cmd/000"
+$id: "https://schemas.electricity.works/types/g.node.create.cmd/001"
 
 title: "g.node.create.cmd"
 type: object
@@ -16,11 +16,11 @@ description: >
 properties:
 
   NewNode:
-    $ref: "https://schemas.electricity.works/types/g.node.gt/005"
+    $ref: "https://schemas.electricity.works/types/g.node.gt/006"
     description: >
-      The GNode entering the registry. Its Alias places it in the topology;
-      its PositionPointId is carried in the command (submitter-assigned,
-      never derived from coordinates).
+      The GNode entering the registry. Its Alias places it in the topology.
+      It carries no PositionPointId (axiom 1): a location identity is
+      registered after creation.
 
   Proof:
     type: string
@@ -34,7 +34,7 @@ properties:
     const: "g.node.create.cmd"
 
   Version:
-    const: "000"
+    const: "001"
 
 required:
   - NewNode
@@ -51,14 +51,27 @@ examples:
         "Alias": "hw1.isone.me.versant.keene.beech",
         "BaseClass": "LeafTransactiveNode",
         "GNodeClass": "LeafTransactiveNode",
-        "Status": "Active",
-        "PositionPointId": "198ca6af-5a4b-43a2-a8a9-7546deabc731",
+        "Status": "Pending",
         "TypeName": "g.node.gt",
-        "Version": "005"
+        "Version": "006"
       },
       "TypeName": "g.node.create.cmd",
-      "Version": "000"
+      "Version": "001"
     }
 
 x-gridworks:
   owner: "gridworks-energy"
+
+  axioms:
+
+    - number: 1
+      name: "LocationlessAtCreation"
+      statement: >
+        NewNode.PositionPointId SHALL be null.
+
+  extended_description: >
+    Creation is locationless: a location identity is registered against the
+    node after it exists, through the location-registration surface, never
+    carried in the create command. Composed with g.node.gt/006 axiom 2, a
+    physical GNode therefore enters the registry Pending; a logical GNode
+    may enter Active.

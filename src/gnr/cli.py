@@ -26,7 +26,6 @@ import uuid
 
 import certifi
 import uvicorn
-
 from gwbase import Orchestrator, ServiceSettings
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 
@@ -63,7 +62,9 @@ def _run_snapshot(roots: list[str]) -> None:
     if not roots:
         with SessionLocal() as s:
             roots = sorted(
-                row.alias for row in s.query(GNodeSql).all() if is_forest_root(row.alias)
+                row.alias
+                for row in s.query(GNodeSql).all()
+                if is_forest_root(row.alias)
             )
     run = RabbitRunSettings()
     actor = GnrRabbit(
@@ -115,13 +116,16 @@ def _api_get(base: str, alias: str) -> dict | None:
             f"{base}/gnr/g-node-by-alias/{alias}", timeout=5, context=ctx
         ) as r:
             return json.load(r)
-    except Exception:
+    except Exception:  # noqa: BLE001 -- availability probe; absence is the answer
         return None
 
 
 _PHYSICAL = [c.value for c in BaseGNodeClass if c != BaseGNodeClass.Logical]
 _KNOWN_LOGICAL = [
-    "Scada", "TimeCoordinator", "WeatherForecastService", "PriceForecastService",
+    "Scada",
+    "TimeCoordinator",
+    "WeatherForecastService",
+    "PriceForecastService",
 ]
 
 
@@ -181,9 +185,9 @@ def _run_create(args: argparse.Namespace) -> None:
         base_class=base_class,
         g_node_class=args.g_node_class or base_class.value,
         status=GNodeStatus.Pending,
-        position_point_id=(
-            None if base_class == BaseGNodeClass.Logical else str(uuid.uuid4())
-        ),
+        # Pending-first (g.node.create.cmd/001 axiom 1): creation never
+        # carries a location; the identity is registered after creation.
+        position_point_id=None,
         display_name=args.display_name or args.alias.rsplit(".", 1)[-1].title(),
     )
     print(json.dumps(node.to_dict(), indent=2))
@@ -257,7 +261,9 @@ def _run_create(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="gnr", description="Grid Node Registry service")
+    parser = argparse.ArgumentParser(
+        prog="gnr", description="Grid Node Registry service"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("rabbit", help="run the rabbit write loop")
     sub.add_parser("api", help="run the HTTP read façade")
@@ -266,22 +272,25 @@ def main() -> None:
         help="broadcast a forest snapshot per root and exit (anti-entropy)",
     )
     snapshot.add_argument(
-        "roots", nargs="*",
+        "roots",
+        nargs="*",
         help="root aliases to snapshot (default: every forest root)",
     )
     create = sub.add_parser(
         "create",
         help="operator: enter ONE GNode (Pending) over the broker; no "
-             "arguments → interactive wizard",
+        "arguments → interactive wizard",
     )
     create.add_argument(
-        "alias", nargs="?",
+        "alias",
+        nargs="?",
         help="e.g. hw1.isone.me.versant.keene (omit for the wizard)",
     )
     create.add_argument(
-        "g_node_class", nargs="?",
+        "g_node_class",
+        nargs="?",
         help="GNodeClass, e.g. MarketMaker or Scada — BaseGNodeClass is "
-             "inferred (g.node.gt axiom 1)",
+        "inferred (g.node.gt axiom 1)",
     )
     create.add_argument(
         "--g-node-id",

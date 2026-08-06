@@ -1,14 +1,14 @@
 metadata:
   generated_from: indexes/public_registry.yaml
-  generated_at: '2026-07-29T16:05:50Z'
+  generated_at: '2026-08-06T14:42:50Z'
   note: Transitive closure of initial_targets
 initial_targets:
-- g.node.gt:005
+- g.node.gt:006
 - connectivity.edge.gt:000
 - position.point.gt:000
-- g.node.create.cmd:000
-- g.node.reparent.cmd:001
-- g.node.forest:001
+- g.node.create.cmd:001
+- g.node.reparent.cmd:002
+- g.node.forest:002
 - g.node.forest.request:000
 - g.node.cmd.ack:000
 - g.node.cmd.nack:000
@@ -38,20 +38,20 @@ worklist:
       '000':
         path: definitions/types/g.node.cmd.nack/000.yaml
     g.node.create.cmd:
-      '000':
-        path: definitions/types/g.node.create.cmd/000.yaml
-    g.node.forest:
       '001':
-        path: definitions/types/g.node.forest/001.yaml
+        path: definitions/types/g.node.create.cmd/001.yaml
+    g.node.forest:
+      '002':
+        path: definitions/types/g.node.forest/002.yaml
     g.node.forest.request:
       '000':
         path: definitions/types/g.node.forest.request/000.yaml
     g.node.gt:
-      '005':
-        path: definitions/types/g.node.gt/005.yaml
+      '006':
+        path: definitions/types/g.node.gt/006.yaml
     g.node.reparent.cmd:
-      '001':
-        path: definitions/types/g.node.reparent.cmd/001.yaml
+      '002':
+        path: definitions/types/g.node.reparent.cmd/002.yaml
     position.point.gt:
       '000':
         path: definitions/types/position.point.gt/000.yaml

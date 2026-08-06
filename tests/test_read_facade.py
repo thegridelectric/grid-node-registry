@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 
 from gnr.api import create_app
 from gnr.db.authority import PostgresAuthority
-from gnr.dev_universe import DEV_POSITION, seed_dev_universe
+from gnr.dev_universe import DEV_POSITION_ID, seed_dev_universe
 from gnr.sema.enums import BaseGNodeClass, GNodeStatus
 from gnr.sema.types import GNodeGt, GNodeReparentCmd
 
@@ -30,7 +30,11 @@ _REQ_ID = "f47ac10b-58cc-4372-a567-0e02b2c3d479"
 def client(session_factory):
     with session_factory() as s:
         seed_dev_universe(s)
-    return TestClient(create_app(authority=PostgresAuthority(session_factory=session_factory, universe="d1")))
+    return TestClient(
+        create_app(
+            authority=PostgresAuthority(session_factory=session_factory, universe="d1")
+        )
+    )
 
 
 def _forest_request(roots):
@@ -63,12 +67,17 @@ def test_forest_under_keene(client):
 
 
 def test_g_node_by_id(client):
-    forest = client.post("/gnr/g-node-forest-request", json=_forest_request([KEENE])).json()
+    forest = client.post(
+        "/gnr/g-node-forest-request", json=_forest_request([KEENE])
+    ).json()
     keene = next(n for n in forest["Nodes"] if n["Alias"] == KEENE)
 
     r = client.get(f"/gnr/g-node-by-id/{keene['GNodeId']}")
     assert r.status_code == 200 and r.json()["Alias"] == KEENE
-    assert client.get("/gnr/g-node-by-id/00000000-0000-4000-8000-000000000000").status_code == 404
+    assert (
+        client.get("/gnr/g-node-by-id/00000000-0000-4000-8000-000000000000").status_code
+        == 404
+    )
 
 
 def test_g_node_by_alias_current(client):
@@ -84,9 +93,13 @@ def test_g_node_by_alias_resolves_stale(client, session_factory):
 
     # rename it: introduce keene.sub and move the beech home beneath it
     new_cn = GNodeGt(
-        g_node_id=str(uuid.uuid4()), alias=f"{KEENE}.sub",
-        base_class=BaseGNodeClass.ConnectivityNode, g_node_class="ConnectivityNode",
-        status=GNodeStatus.Active, position_point_id=DEV_POSITION.id, display_name="sub",
+        g_node_id=str(uuid.uuid4()),
+        alias=f"{KEENE}.sub",
+        base_class=BaseGNodeClass.ConnectivityNode,
+        g_node_class="ConnectivityNode",
+        status=GNodeStatus.Active,
+        position_point_id=DEV_POSITION_ID,
+        display_name="sub",
     )
     PostgresAuthority(session_factory=session_factory, universe="d1").apply_reparent(
         GNodeReparentCmd(new_node=new_cn, moved_child_g_node_ids=[beech_id])

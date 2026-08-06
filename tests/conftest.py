@@ -51,7 +51,7 @@ def pg_url():
     try:
         pg = PostgresContainer("postgres:16", driver="psycopg")
         pg.start()
-    except Exception as e:  # Docker not available / image pull failed
+    except Exception as e:  # noqa: BLE001 -- Docker not available / image pull failed
         pytest.skip(f"could not start a testcontainers Postgres: {e}")
 
     # The yield is outside the start try/except so a *test* failure thrown back
@@ -106,7 +106,7 @@ def rabbit_url():
     try:
         rabbit = RabbitMqContainer("rabbitmq:3.13")
         rabbit.start()
-    except Exception as e:  # Docker not available / image pull failed
+    except Exception as e:  # noqa: BLE001 -- Docker not available / image pull failed
         pytest.skip(f"could not start a testcontainers RabbitMQ: {e}")
 
     try:

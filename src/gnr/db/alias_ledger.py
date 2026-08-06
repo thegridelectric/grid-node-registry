@@ -26,7 +26,9 @@ class AliasAlreadyOwned(Exception):
     requested owner is not the one that holds it.
     """
 
-    def __init__(self, alias: LeftRightDot, current_owner: UUID4Str, requested_owner: UUID4Str) -> None:
+    def __init__(
+        self, alias: LeftRightDot, current_owner: UUID4Str, requested_owner: UUID4Str
+    ) -> None:
         self.alias = alias
         self.current_owner = current_owner
         self.requested_owner = requested_owner

@@ -28,16 +28,17 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
+from gnr.db.models import ConnectivityEdgeSql, GNodeSql, PositionPointSql
 from gnr.sema.enums import BaseGNodeClass, GNodeStatus
 from gnr.sema.property_format import LeftRightDot, UUID4Str
-from gnr.db.models import ConnectivityEdgeSql, GNodeSql, PositionPointSql
-
 
 # A **CopperNode** is the copper-topology backbone class — a ConnectivityNode or a
 # MarketMaker (a MarketMaker is a ConnectivityNode that also runs a local market).
 # The backbone is parent-closed: a CopperNode's parent is another CopperNode, unless
 # it is a forest root (its alias-parent is the bare universe token, not a GNode).
-COPPER_CLASSES = frozenset({BaseGNodeClass.ConnectivityNode, BaseGNodeClass.MarketMaker})
+COPPER_CLASSES = frozenset(
+    {BaseGNodeClass.ConnectivityNode, BaseGNodeClass.MarketMaker}
+)
 
 
 @dataclass(frozen=True)
@@ -83,15 +84,23 @@ def check_parent_closed_active(nodes_by_alias: dict[str, GNodeSql]) -> list[Viol
         p_alias = parent_alias(node.alias)
         parent = nodes_by_alias.get(p_alias)
         if parent is None:
-            violations.append(Violation(
-                "parent_closed_active", node.id, node.alias,
-                f"active non-root node has no parent at alias {p_alias!r}",
-            ))
+            violations.append(
+                Violation(
+                    "parent_closed_active",
+                    node.id,
+                    node.alias,
+                    f"active non-root node has no parent at alias {p_alias!r}",
+                )
+            )
         elif parent.status != GNodeStatus.Active:
-            violations.append(Violation(
-                "parent_closed_active", node.id, node.alias,
-                f"parent {p_alias!r} is {parent.status.value}, not Active",
-            ))
+            violations.append(
+                Violation(
+                    "parent_closed_active",
+                    node.id,
+                    node.alias,
+                    f"parent {p_alias!r} is {parent.status.value}, not Active",
+                )
+            )
     return violations
 
 
@@ -105,7 +114,9 @@ def check_universe_scope(
     """
     return [
         Violation(
-            "universe_scope", node.id, node.alias,
+            "universe_scope",
+            node.id,
+            node.alias,
             f"alias is in universe {universe_of(node.alias)!r}; "
             f"this registry serves {universe!r}",
         )
@@ -127,7 +138,9 @@ def check_active_physical_have_position(
     """
     return [
         Violation(
-            "active_position", node.id, node.alias,
+            "active_position",
+            node.id,
+            node.alias,
             f"Active {node.base_class} must hold its PositionPoint "
             f"(position_point_id={node.position_point_id!r} has no row)",
         )
@@ -135,8 +148,7 @@ def check_active_physical_have_position(
         if node.status == GNodeStatus.Active
         and node.base_class != BaseGNodeClass.Logical
         and (
-            node.position_point_id is None
-            or node.position_point_id not in position_ids
+            node.position_point_id is None or node.position_point_id not in position_ids
         )
     ]
 
@@ -163,27 +175,36 @@ def check_edges_non_tree(
         to = nodes_by_id.get(edge.to_g_node_id)
         if frm is None or to is None:
             missing = edge.from_g_node_id if frm is None else edge.to_g_node_id
-            violations.append(Violation(
-                "edge_non_tree", edge.id, "",
-                f"active edge endpoint {missing!r} does not exist",
-            ))
+            violations.append(
+                Violation(
+                    "edge_non_tree",
+                    edge.id,
+                    "",
+                    f"active edge endpoint {missing!r} does not exist",
+                )
+            )
             continue
         for node in (frm, to):
             if node.status != GNodeStatus.Active:
-                violations.append(Violation(
-                    "edge_non_tree", edge.id, node.alias,
-                    f"active edge endpoint {node.alias!r} is "
-                    f"{node.status.value}, not Active",
-                ))
-        if (
-            parent_alias(to.alias) == frm.alias
-            or parent_alias(frm.alias) == to.alias
-        ):
-            violations.append(Violation(
-                "edge_non_tree", edge.id, to.alias,
-                f"edge {frm.alias!r} ↔ {to.alias!r} mirrors a parent-child tree "
-                "edge; the tree is the alias structure and is never stored",
-            ))
+                violations.append(
+                    Violation(
+                        "edge_non_tree",
+                        edge.id,
+                        node.alias,
+                        f"active edge endpoint {node.alias!r} is "
+                        f"{node.status.value}, not Active",
+                    )
+                )
+        if parent_alias(to.alias) == frm.alias or parent_alias(frm.alias) == to.alias:
+            violations.append(
+                Violation(
+                    "edge_non_tree",
+                    edge.id,
+                    to.alias,
+                    f"edge {frm.alias!r} ↔ {to.alias!r} mirrors a parent-child tree "
+                    "edge; the tree is the alias structure and is never stored",
+                )
+            )
     return violations
 
 
@@ -214,40 +235,48 @@ def check_class_hierarchy(nodes_by_alias: dict[str, GNodeSql]) -> list[Violation
             # No GNode parent — only a CopperNode or a non-Scada Logical node may
             # sit at a forest top (LTN/TA/Scada each require a specific parent).
             ok = node.base_class in COPPER_CLASSES or (
-                node.base_class == BaseGNodeClass.Logical and node.g_node_class != "Scada"
+                node.base_class == BaseGNodeClass.Logical
+                and node.g_node_class != "Scada"
             )
             if not ok:
-                violations.append(Violation(
-                    "class_hierarchy", node.id, node.alias,
-                    f"a {node.g_node_class} cannot be a forest root; it requires a parent",
-                ))
+                violations.append(
+                    Violation(
+                        "class_hierarchy",
+                        node.id,
+                        node.alias,
+                        f"a {node.g_node_class} cannot be a forest root; it requires a parent",
+                    )
+                )
             continue
         parent = nodes_by_alias.get(parent_alias(node.alias))
         if parent is None:
             continue
         bc, pbc = node.base_class, parent.base_class
         kind = bc.value
-        if bc in COPPER_CLASSES:
-            ok = pbc in COPPER_CLASSES
-            allowed = "a CopperNode (ConnectivityNode/MarketMaker)"
-        elif bc == BaseGNodeClass.LeafTransactiveNode:
+        if bc in COPPER_CLASSES or bc == BaseGNodeClass.LeafTransactiveNode:
             ok = pbc in COPPER_CLASSES
             allowed = "a CopperNode (ConnectivityNode/MarketMaker)"
         elif bc == BaseGNodeClass.TerminalAsset:
             ok = pbc == BaseGNodeClass.LeafTransactiveNode
             allowed = "a LeafTransactiveNode"
-        elif node.g_node_class == "Scada":  # Logical base_class, but anchored to its home LTN
+        elif (
+            node.g_node_class == "Scada"
+        ):  # Logical base_class, but anchored to its home LTN
             kind = "Scada"
             ok = pbc == BaseGNodeClass.LeafTransactiveNode
             allowed = "a LeafTransactiveNode"
         else:  # other Logical — unconstrained
             continue
         if not ok:
-            violations.append(Violation(
-                "class_hierarchy", node.id, node.alias,
-                f"a {kind} must have a parent that is {allowed}; "
-                f"parent {parent.alias!r} is a {pbc.value}",
-            ))
+            violations.append(
+                Violation(
+                    "class_hierarchy",
+                    node.id,
+                    node.alias,
+                    f"a {kind} must have a parent that is {allowed}; "
+                    f"parent {parent.alias!r} is a {pbc.value}",
+                )
+            )
     return violations
 
 
