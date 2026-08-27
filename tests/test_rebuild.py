@@ -24,8 +24,9 @@ from gnr.db.models import (
     PositionPointSql,
 )
 from gnr.db.validate import validate_registry
-from gnr.rebuild import replay
-from gnr.sema.enums import BaseGNodeClass as B, GNodeStatus as S
+from gnr.rebuild import checkpoint_state, replay
+from gnr.sema.enums import BaseGNodeClass as B
+from gnr.sema.enums import GNodeStatus as S
 from gnr.sema.types import GNodeCreateCmd, GNodeGt, GNodeReparentCmd
 
 pytestmark = pytest.mark.integration
@@ -53,7 +54,9 @@ def _pending(alias: str, bc: B) -> GNodeGt:
         base_class=bc,
         g_node_class=bc.value,
         status=S.Pending,
-        position_point_id=str(uuid.uuid4()),
+        # Pending-first (create.cmd/001 axiom 1): a location is registered
+        # after creation, never carried in the command.
+        position_point_id=None,
         display_name=alias.rsplit(".", 1)[-1],
     )
 
@@ -79,10 +82,9 @@ def test_wipe_replay_reaches_identical_state(session_factory):
         capture.append(_line(auth.apply_create(cmd)))
 
     # A refused command — the ear hears every publish, including ones the
-    # registry says no to: an Active physical create with no position row.
-    ghost = _pending("d1.isone.keene.ghost", B.ConnectivityNode).model_copy(
-        update={"status": S.Active}
-    )
+    # registry says no to: a second create claiming a held alias under a
+    # fresh GNodeId (aliases are never recycled).
+    ghost = _pending("d1.isone.keene.willow", B.LeafTransactiveNode)
     ghost_cmd = GNodeCreateCmd(new_node=ghost)
     capture.append(_line(ghost_cmd))
     with pytest.raises(CreateError):
@@ -90,9 +92,7 @@ def test_wipe_replay_reaches_identical_state(session_factory):
 
     # A re-parent: introduce keene.sub, move the willow subtree beneath it.
     sub = _pending("d1.isone.keene.sub", B.ConnectivityNode)
-    rcmd = GNodeReparentCmd(
-        new_node=sub, moved_child_g_node_ids=[chain[2].g_node_id]
-    )
+    rcmd = GNodeReparentCmd(new_node=sub, moved_child_g_node_ids=[chain[2].g_node_id])
     capture.append(_line(rcmd))
     capture.append(_line(auth.apply_reparent(rcmd)))
 
@@ -107,6 +107,8 @@ def test_wipe_replay_reaches_identical_state(session_factory):
     assert report.refused == 1
     assert report.checkpoints == 4
     assert report.skipped_type_names == set()
-    assert auth.get_forest(["d1.isone"]).to_dict() == original
+    assert checkpoint_state(
+        auth.get_forest(["d1.isone"]).to_dict()
+    ) == checkpoint_state(original)
     with session_factory() as s:
         assert validate_registry(s, UNIVERSE) == []

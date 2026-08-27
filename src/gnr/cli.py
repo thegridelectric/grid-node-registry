@@ -324,7 +324,8 @@ def main() -> None:
     )
     rebuild.add_argument("capture", help="path to the capture file (JSON Lines)")
     rebuild.add_argument(
-        "--wipe", action="store_true",
+        "--wipe",
+        action="store_true",
         help="empty the registry first (required when it holds rows)",
     )
     snapshot = sub.add_parser(

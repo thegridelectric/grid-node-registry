@@ -13,25 +13,22 @@ from __future__ import annotations
 
 import json
 import time
-import uuid
 
 import pytest
-from pydantic import SecretStr
-
 from gwbase import ActorBase, Orchestrator, ServiceSettings
 from gwbase.config.rabbit_settings import RabbitBrokerClient
 from gwbase.topology import EAR_EXCHANGE
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
+from pydantic import SecretStr
+from test_layer2_rabbit import provision_topology
+from test_rebuild import _pending, _wipe
 
 from gnr.db.authority import PostgresAuthority
 from gnr.db.validate import validate_registry
-from gnr.rebuild import rebuild_from_file
 from gnr.gnr_rabbit import GnrRabbit
-from gnr.sema.enums import BaseGNodeClass as B, GNodeStatus as S
-from gnr.sema.types import GNodeCreateCmd, GNodeGt, GNodeReparentCmd
-
-from test_layer2_rabbit import provision_topology
-from test_rebuild import _pending, _wipe
+from gnr.rebuild import checkpoint_state, rebuild_from_file
+from gnr.sema.enums import BaseGNodeClass as B
+from gnr.sema.types import GNodeCreateCmd, GNodeReparentCmd
 
 pytestmark = pytest.mark.integration
 
@@ -50,9 +47,7 @@ class CaptureTap(ActorBase):
     def local_rabbit_startup(self) -> None:
         # The tap's slice is everything: the fabric feeds the bus into
         # `ear_tx`; a deployed capture may narrow this binding to its slice.
-        self._single_channel.queue_bind(
-            self.queue_name, EAR_EXCHANGE, routing_key="#"
-        )
+        self._single_channel.queue_bind(self.queue_name, EAR_EXCHANGE, routing_key="#")
 
     def dispatch_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
         with open(self._path, "a", encoding="utf-8") as f:
@@ -99,7 +94,8 @@ def _forest_lines(path) -> int:
     if not path.exists():
         return 0
     return sum(
-        1 for line in path.read_text().splitlines()
+        1
+        for line in path.read_text().splitlines()
         if '"TypeName": "g.node.forest"' in json.loads(line)["body"]
         or '"TypeName":"g.node.forest"' in json.loads(line)["body"]
     )
@@ -138,11 +134,17 @@ def test_rebuild_from_real_broker_capture(session_factory, rabbit_url, tmp_path)
         willow = _pending("d1.isone.keene.willow", B.LeafTransactiveNode)
         for node in (isone, keene, willow):
             mm.publish(GNodeCreateCmd(new_node=node))
-        _wait_for(lambda: _forest_lines(capture_path) >= 3, 20, "3 create broadcasts captured")
+        _wait_for(
+            lambda: _forest_lines(capture_path) >= 3, 20, "3 create broadcasts captured"
+        )
 
         sub = _pending("d1.isone.keene.sub", B.ConnectivityNode)
-        mm.publish(GNodeReparentCmd(new_node=sub, moved_child_g_node_ids=[willow.g_node_id]))
-        _wait_for(lambda: _forest_lines(capture_path) >= 4, 20, "re-parent broadcast captured")
+        mm.publish(
+            GNodeReparentCmd(new_node=sub, moved_child_g_node_ids=[willow.g_node_id])
+        )
+        _wait_for(
+            lambda: _forest_lines(capture_path) >= 4, 20, "re-parent broadcast captured"
+        )
     finally:
         mm.stop()
         registry.stop()
@@ -160,6 +162,8 @@ def test_rebuild_from_real_broker_capture(session_factory, rabbit_url, tmp_path)
     assert report.applied == 4
     assert report.refused == 0
     assert report.checkpoints == 4
-    assert auth.get_forest(["d1.isone"]).to_dict() == original
+    assert checkpoint_state(
+        auth.get_forest(["d1.isone"]).to_dict()
+    ) == checkpoint_state(original)
     with session_factory() as s:
         assert validate_registry(s, "d1") == []

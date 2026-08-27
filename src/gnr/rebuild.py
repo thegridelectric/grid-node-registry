@@ -21,8 +21,8 @@ from __future__ import annotations
 
 import json
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 
 from gnr.db.authority import (
     AuthoritySource,
@@ -48,6 +48,13 @@ class RebuildReport:
     @property
     def ok(self) -> bool:
         return not self.mismatches
+
+
+def checkpoint_state(forest: dict) -> dict:
+    """A broadcast's comparable content: the forest minus its send time. The
+    stamp is when the registry spoke, not registry state — a replay speaks
+    at a different instant and must still match."""
+    return {k: v for k, v in forest.items() if k != "SendTimeMs"}
 
 
 def replay(capture_lines: Iterable[str], authority: AuthoritySource) -> RebuildReport:
@@ -89,10 +96,13 @@ def replay(capture_lines: Iterable[str], authority: AuthoritySource) -> RebuildR
         elif type_name == FOREST:
             report.checkpoints += 1
             captured = default_codec.from_dict(payload)
-            captured_dict = captured.to_dict()
-            if produced and produced[0] == captured_dict:
+            captured_dict = checkpoint_state(captured.to_dict())
+            if produced and checkpoint_state(produced[0]) == captured_dict:
                 produced.popleft()
-            elif authority.get_forest(captured.roots).to_dict() != captured_dict:
+            elif (
+                checkpoint_state(authority.get_forest(captured.roots).to_dict())
+                != captured_dict
+            ):
                 report.mismatches.append(
                     f"line {n}: forest under {list(captured.roots)!r} diverges "
                     "from the captured broadcast"
@@ -102,7 +112,9 @@ def replay(capture_lines: Iterable[str], authority: AuthoritySource) -> RebuildR
     return report
 
 
-def rebuild_from_file(path: str, authority: AuthoritySource | None = None) -> RebuildReport:
+def rebuild_from_file(
+    path: str, authority: AuthoritySource | None = None
+) -> RebuildReport:
     """Replay the JSONL capture at `path` (authority defaults to the
     env-configured Postgres)."""
     from gnr.settings import Settings
