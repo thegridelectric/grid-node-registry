@@ -145,6 +145,52 @@ restart.
 | `gnr-snapshot.timer` → `.service` | periodic one-shot `gnr snapshot` — re-broadcasts each forest root (anti-entropy); cadence lives in the timer file | `journalctl -u gnr-snapshot` |
 | `gnr-postgres` (docker) | Postgres 16 | `docker logs gnr-postgres` |
 
+## New instance — bring-up and populate
+
+A fresh box holds nothing the registry needs beyond its config: the
+durable content is the seed ear's capture of the command stream (the seed
+store bucket), and the registry is rebuilt from it. Order:
+
+1. **Postgres** on the box's encrypted volume — `gnr-postgres`, Postgres 16,
+   loopback only; the DB URL goes in `.env` (`GNR_DB_URL`).
+2. **Schema:** `uv run alembic upgrade head` from the checkout.
+3. **Services:** copy `service/*.service` + `*.timer` to
+   `/etc/systemd/system/`, `daemon-reload`, enable `gnr-rabbit`, `gnr-api`,
+   `gnr-snapshot.timer`; front `:8000` with the TLS proxy. `gnr-rabbit`
+   must be the only consumer on the registry's queue — stop the old
+   instance before starting the new one.
+4. **Populate**, one of:
+   - **Rebuild from the seed store** (the normal restore):
+     ```
+     gnr rebuild --seedstore --from YYYYMMDD [--to YYYYMMDD] [--wipe]
+     ```
+     Reads the ear's eventstore objects day by day from
+     `<world_instance>/eventstore/`, selects the three replay types by
+     name (`g.node.create.cmd`, `g.node.reparent.cmd`, `g.node.forest`),
+     replays them in `persisted-ms` order through the handler core, and
+     checks every captured forest broadcast against the rebuilding
+     registry (send time excluded). Needs `GNR_SEEDSTORE__PROFILE` (a
+     named profile in `~/.aws/{credentials,config}` whose `endpoint_url`
+     aims boto3 at the S3-compatible host), `GNR_SEEDSTORE__BUCKET`, and
+     `GNR_SEEDSTORE__WORLD_INSTANCE` (the broker vhost, e.g. `hw1__1`).
+     `--from` is the first day of the current stream epoch: an epoch
+     begins whenever the stream is restarted under new schema versions,
+     and objects before it are history, not input. `--wipe` empties an
+     occupied registry first, `command_log` included. Exit status is
+     non-zero on any checkpoint mismatch or invariant violation.
+     `--capture-dir DIR` reads the same objects from a directory instead
+     (an ear's local retry cache, or a mirrored tree).
+   - **Regenesis** (restart the stream): when the captured commands are
+     under superseded schema versions, re-enter every node through the
+     operator path — `gnr create <alias> <class> --g-node-id <id>
+     --display-name <name>`, parents first, sourced from the latest
+     `g.node.forest` snapshots — so identity carries over (same GNodeId
+     and alias) under current versions and the seed ear witnesses a new
+     epoch. Needs the operator environment (`operator.env`).
+
+Verify: `GET /gnr/g-node-by-alias/<root>` on the public API, and the seed
+store showing the new instance's broadcasts.
+
 ## Tests
 
 ```
