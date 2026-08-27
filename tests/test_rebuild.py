@@ -10,7 +10,6 @@ registry originally refused re-refusing on replay (executor *Durability*).
 
 from __future__ import annotations
 
-import json
 import uuid
 
 import pytest
@@ -61,14 +60,14 @@ def _pending(alias: str, bc: B) -> GNodeGt:
     )
 
 
-def _line(sema_type) -> str:
-    return json.dumps({"body": sema_type.to_bytes().decode()})
+def _line(sema_type) -> bytes:
+    return sema_type.to_bytes()
 
 
 def test_wipe_replay_reaches_identical_state(session_factory):
     _wipe(session_factory)
     auth = PostgresAuthority(session_factory=session_factory, universe=UNIVERSE)
-    capture: list[str] = []
+    capture: list[bytes] = []
 
     # Genesis: a Pending copper chain + home, parents-first, as commands.
     chain = [

@@ -11,7 +11,6 @@ file, no decoding: the same shape OPS-443's durable capture writes.
 
 from __future__ import annotations
 
-import json
 import time
 
 import pytest
@@ -26,7 +25,7 @@ from test_rebuild import _pending, _wipe
 from gnr.db.authority import PostgresAuthority
 from gnr.db.validate import validate_registry
 from gnr.gnr_rabbit import GnrRabbit
-from gnr.rebuild import checkpoint_state, rebuild_from_file
+from gnr.rebuild import LocalCaptureDir, checkpoint_state, rebuild
 from gnr.sema.enums import BaseGNodeClass as B
 from gnr.sema.types import GNodeCreateCmd, GNodeReparentCmd
 
@@ -36,13 +35,14 @@ REGISTRY_ALIAS = "d1.registry"
 
 
 class CaptureTap(ActorBase):
-    """A real ear tap: append every message heard on the bus to a JSONL file,
-    body verbatim. `dispatch_message` (the raw tier) rather than a decoded
-    hook — a lossless tap does not interpret; capture order is arrival order."""
+    """A real ear tap: store every message heard on the bus as one object
+    under the ear's name grammar (`<from>-<type>-<ms>-<source>.json`), body
+    verbatim. `dispatch_message` (the raw tier) rather than a decoded hook —
+    a lossless tap does not interpret; capture order is arrival order."""
 
-    def __init__(self, *, settings: ServiceSettings, path) -> None:
+    def __init__(self, *, settings: ServiceSettings, root) -> None:
         super().__init__(settings=settings)
-        self._path = path
+        self._root = root
 
     def local_rabbit_startup(self) -> None:
         # The tap's slice is everything: the fabric feeds the bus into
@@ -50,8 +50,11 @@ class CaptureTap(ActorBase):
         self._single_channel.queue_bind(self.queue_name, EAR_EXCHANGE, routing_key="#")
 
     def dispatch_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
-        with open(self._path, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"body": body.decode()}) + "\n")
+        name = (
+            f"{envelope.from_alias}-{envelope.type_name}"
+            f"-{int(time.time() * 1000)}-{self.alias}.json"
+        )
+        (self._root / name).write_bytes(body)
 
 
 class CommandPublisher(Orchestrator):
@@ -90,22 +93,16 @@ def _wait_for(predicate, timeout_s: float, message: str) -> None:
     raise TimeoutError(f"Timed out after {timeout_s}s waiting for: {message}")
 
 
-def _forest_lines(path) -> int:
-    if not path.exists():
-        return 0
-    return sum(
-        1
-        for line in path.read_text().splitlines()
-        if '"TypeName": "g.node.forest"' in json.loads(line)["body"]
-        or '"TypeName":"g.node.forest"' in json.loads(line)["body"]
-    )
+def _forest_objects(root) -> int:
+    return sum(1 for p in root.glob("*.json") if "-g.node.forest-" in p.name)
 
 
 def test_rebuild_from_real_broker_capture(session_factory, rabbit_url, tmp_path):
     _wipe(session_factory)
     provision_topology(rabbit_url)
     rabbit = RabbitBrokerClient(url=SecretStr(rabbit_url))
-    capture_path = tmp_path / "capture.jsonl"
+    capture_dir = tmp_path / "capture"
+    capture_dir.mkdir()
 
     registry = GnrRabbit(
         settings=ServiceSettings(service_alias=REGISTRY_ALIAS, rabbit=rabbit),
@@ -113,7 +110,7 @@ def test_rebuild_from_real_broker_capture(session_factory, rabbit_url, tmp_path)
     )
     tap = CaptureTap(
         settings=ServiceSettings(service_alias="d1.captap", rabbit=rabbit),
-        path=capture_path,
+        root=capture_dir,
     )
     mm = CommandPublisher(
         settings=ServiceSettings(service_alias="d1.isone", rabbit=rabbit),
@@ -135,7 +132,9 @@ def test_rebuild_from_real_broker_capture(session_factory, rabbit_url, tmp_path)
         for node in (isone, keene, willow):
             mm.publish(GNodeCreateCmd(new_node=node))
         _wait_for(
-            lambda: _forest_lines(capture_path) >= 3, 20, "3 create broadcasts captured"
+            lambda: _forest_objects(capture_dir) >= 3,
+            20,
+            "3 create broadcasts captured",
         )
 
         sub = _pending("d1.isone.keene.sub", B.ConnectivityNode)
@@ -143,7 +142,9 @@ def test_rebuild_from_real_broker_capture(session_factory, rabbit_url, tmp_path)
             GNodeReparentCmd(new_node=sub, moved_child_g_node_ids=[willow.g_node_id])
         )
         _wait_for(
-            lambda: _forest_lines(capture_path) >= 4, 20, "re-parent broadcast captured"
+            lambda: _forest_objects(capture_dir) >= 4,
+            20,
+            "re-parent broadcast captured",
         )
     finally:
         mm.stop()
@@ -156,7 +157,7 @@ def test_rebuild_from_real_broker_capture(session_factory, rabbit_url, tmp_path)
 
     # Wipe everything; the capture file is now the only record. Rebuild.
     _wipe(session_factory)
-    report = rebuild_from_file(str(capture_path), auth)
+    report = rebuild(LocalCaptureDir(capture_dir), auth)
 
     assert report.ok, report.mismatches
     assert report.applied == 4

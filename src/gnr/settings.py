@@ -1,5 +1,5 @@
 from gwbase import ServiceSettings
-from pydantic import SecretStr, field_validator
+from pydantic import BaseModel, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # The single production universe's requirements that are still stubs. Booting a
@@ -83,6 +83,32 @@ class ApiRunSettings(BaseSettings):
 
     api_host: str = "127.0.0.1"
     api_port: int = 8000
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="gnr_",
+        env_nested_delimiter="__",
+        extra="ignore",
+    )
+
+
+class SeedstoreConfig(BaseModel):
+    """Where the ear's capture of this registry's slice lives, for
+    `gnr rebuild --seedstore`. All required: the profile is a named entry in
+    the operator's `~/.aws/{credentials,config}` (its `endpoint_url` aims the
+    client at the S3-compatible host, Backblaze B2 in production), the bucket
+    is the seed store, the world instance is the key's first segment (the
+    broker vhost, e.g. `hw1__1`)."""
+
+    profile: str
+    bucket: str
+    world_instance: str
+
+
+class SeedstoreSettings(BaseSettings):
+    """`GNR_SEEDSTORE__PROFILE` / `__BUCKET` / `__WORLD_INSTANCE`."""
+
+    seedstore: SeedstoreConfig
 
     model_config = SettingsConfigDict(
         env_file=".env",

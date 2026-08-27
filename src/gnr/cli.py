@@ -23,7 +23,10 @@ import sys
 import time
 import urllib.request
 import uuid
+from datetime import UTC, date, datetime
+from pathlib import Path
 
+import boto3
 import certifi
 import uvicorn
 from gwbase import Orchestrator, ServiceSettings
@@ -58,7 +61,12 @@ def _run_api() -> None:
     uvicorn.run("gnr.api:app", host=run.api_host, port=run.api_port)
 
 
-def _run_rebuild(path: str, wipe: bool) -> None:
+def _day(text: str) -> date:
+    """YYYYMMDD → date (the eventstore's day-folder spelling)."""
+    return date(int(text[:4]), int(text[4:6]), int(text[6:8]))
+
+
+def _run_rebuild(args: argparse.Namespace) -> None:
     from gnr.db.models import (
         AliasAssignmentSql,
         CommandLogSql,
@@ -68,17 +76,29 @@ def _run_rebuild(path: str, wipe: bool) -> None:
     )
     from gnr.db.session import SessionLocal
     from gnr.db.validate import validate_registry
-    from gnr.rebuild import rebuild_from_file
-    from gnr.settings import Settings
+    from gnr.rebuild import LocalCaptureDir, S3Eventstore, rebuild
+    from gnr.settings import SeedstoreSettings, Settings
 
     universe = Settings().universe
+    if args.capture_dir:
+        store = LocalCaptureDir(Path(args.capture_dir))
+    else:
+        cfg = SeedstoreSettings().seedstore
+        client = boto3.Session(profile_name=cfg.profile).client("s3")
+        store = S3Eventstore(
+            client,
+            bucket=cfg.bucket,
+            world_instance=cfg.world_instance,
+            start=_day(args.from_day),
+            end=_day(args.to_day) if args.to_day else datetime.now(UTC).date(),
+        )
     with SessionLocal() as s:
         occupied = s.query(GNodeSql).count()
-        if occupied and not wipe:
+        if occupied and not args.wipe:
             raise SystemExit(
                 f"registry holds {occupied} GNodes; rerun with --wipe to rebuild from capture"
             )
-        if wipe:
+        if args.wipe:
             # command_log must go too: idempotent replay short-circuits on a
             # logged hash, which would skip re-applying against wiped state.
             for table in (
@@ -91,7 +111,7 @@ def _run_rebuild(path: str, wipe: bool) -> None:
                 s.query(table).delete(synchronize_session=False)
             s.commit()
 
-    report = rebuild_from_file(path)
+    report = rebuild(store)
     with SessionLocal() as s:
         violations = validate_registry(s, universe)
 
@@ -320,9 +340,26 @@ def main() -> None:
     sub.add_parser("rabbit", help="run the rabbit write loop")
     sub.add_parser("api", help="run the HTTP read façade")
     rebuild = sub.add_parser(
-        "rebuild", help="rebuild the registry from a JSONL capture (the restore path)"
+        "rebuild",
+        help="rebuild the registry from the ear's capture (the restore path): "
+        "the seed store bucket (--seedstore, GNR_SEEDSTORE__* settings) or a "
+        "directory of eventstore objects (--capture-dir)",
     )
-    rebuild.add_argument("capture", help="path to the capture file (JSON Lines)")
+    source = rebuild.add_mutually_exclusive_group(required=True)
+    source.add_argument(
+        "--seedstore",
+        action="store_true",
+        help="read the seed-store bucket; --from is required",
+    )
+    source.add_argument(
+        "--capture-dir", help="read eventstore objects under this directory"
+    )
+    rebuild.add_argument(
+        "--from", dest="from_day", help="first day to read, YYYYMMDD (--seedstore)"
+    )
+    rebuild.add_argument(
+        "--to", dest="to_day", help="last day to read, YYYYMMDD (default: today)"
+    )
     rebuild.add_argument(
         "--wipe",
         action="store_true",
@@ -367,6 +404,8 @@ def main() -> None:
     elif args.command == "snapshot":
         _run_snapshot(args.roots)
     elif args.command == "rebuild":
-        _run_rebuild(args.capture, wipe=args.wipe)
+        if args.seedstore and not args.from_day:
+            parser.error("--seedstore requires --from YYYYMMDD")
+        _run_rebuild(args)
     else:
         _run_create(args)

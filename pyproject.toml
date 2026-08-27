@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.12,<3.13.0"
 dependencies = [
     "alembic>=1.17.2",
+    "boto3>=1.35",
     "certifi>=2026.6.17",
     "fastapi>=0.123.0",
     "gridworks-base>=0.5.6",
