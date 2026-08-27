@@ -58,6 +58,58 @@ def _run_api() -> None:
     uvicorn.run("gnr.api:app", host=run.api_host, port=run.api_port)
 
 
+def _run_rebuild(path: str, wipe: bool) -> None:
+    from gnr.db.models import (
+        AliasAssignmentSql,
+        CommandLogSql,
+        ConnectivityEdgeSql,
+        GNodeSql,
+        PositionPointSql,
+    )
+    from gnr.db.session import SessionLocal
+    from gnr.db.validate import validate_registry
+    from gnr.rebuild import rebuild_from_file
+    from gnr.settings import Settings
+
+    universe = Settings().universe
+    with SessionLocal() as s:
+        occupied = s.query(GNodeSql).count()
+        if occupied and not wipe:
+            raise SystemExit(
+                f"registry holds {occupied} GNodes; rerun with --wipe to rebuild from capture"
+            )
+        if wipe:
+            # command_log must go too: idempotent replay short-circuits on a
+            # logged hash, which would skip re-applying against wiped state.
+            for table in (
+                ConnectivityEdgeSql,
+                AliasAssignmentSql,
+                GNodeSql,
+                PositionPointSql,
+                CommandLogSql,
+            ):
+                s.query(table).delete(synchronize_session=False)
+            s.commit()
+
+    report = rebuild_from_file(path)
+    with SessionLocal() as s:
+        violations = validate_registry(s, universe)
+
+    print(
+        f"applied {report.applied}, re-refused {report.refused}, "
+        f"checkpoints {report.checkpoints}"
+    )
+    if report.skipped_type_names:
+        print("skipped:", ", ".join(sorted(report.skipped_type_names)))
+    for m in report.mismatches:
+        print("MISMATCH:", m)
+    for v in violations:
+        print("VIOLATION:", v)
+    if report.mismatches or violations:
+        raise SystemExit(1)
+    print("rebuild ok")
+
+
 def _run_snapshot(roots: list[str]) -> None:
     if not roots:
         with SessionLocal() as s:
@@ -267,6 +319,14 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("rabbit", help="run the rabbit write loop")
     sub.add_parser("api", help="run the HTTP read façade")
+    rebuild = sub.add_parser(
+        "rebuild", help="rebuild the registry from a JSONL capture (the restore path)"
+    )
+    rebuild.add_argument("capture", help="path to the capture file (JSON Lines)")
+    rebuild.add_argument(
+        "--wipe", action="store_true",
+        help="empty the registry first (required when it holds rows)",
+    )
     snapshot = sub.add_parser(
         "snapshot",
         help="broadcast a forest snapshot per root and exit (anti-entropy)",
@@ -305,5 +365,7 @@ def main() -> None:
         _run_api()
     elif args.command == "snapshot":
         _run_snapshot(args.roots)
+    elif args.command == "rebuild":
+        _run_rebuild(args.capture, wipe=args.wipe)
     else:
         _run_create(args)
