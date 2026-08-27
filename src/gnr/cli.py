@@ -23,7 +23,10 @@ import sys
 import time
 import urllib.request
 import uuid
+from datetime import UTC, date, datetime
+from pathlib import Path
 
+import boto3
 import certifi
 import uvicorn
 from gwbase import Orchestrator, ServiceSettings
@@ -56,6 +59,75 @@ def _run_rabbit() -> None:
 def _run_api() -> None:
     run = ApiRunSettings()
     uvicorn.run("gnr.api:app", host=run.api_host, port=run.api_port)
+
+
+def _day(text: str) -> date:
+    """YYYYMMDD → date (the eventstore's day-folder spelling)."""
+    return date(int(text[:4]), int(text[4:6]), int(text[6:8]))
+
+
+def _run_rebuild(args: argparse.Namespace) -> None:
+    from gnr.db.models import (
+        AliasAssignmentSql,
+        CommandLogSql,
+        ConnectivityEdgeSql,
+        GNodeSql,
+        PositionPointSql,
+    )
+    from gnr.db.session import SessionLocal
+    from gnr.db.validate import validate_registry
+    from gnr.rebuild import LocalCaptureDir, S3Eventstore, rebuild
+    from gnr.settings import SeedstoreSettings, Settings
+
+    universe = Settings().universe
+    if args.capture_dir:
+        store = LocalCaptureDir(Path(args.capture_dir))
+    else:
+        cfg = SeedstoreSettings().seedstore
+        client = boto3.Session(profile_name=cfg.profile).client("s3")
+        store = S3Eventstore(
+            client,
+            bucket=cfg.bucket,
+            world_instance=cfg.world_instance,
+            start=_day(args.from_day),
+            end=_day(args.to_day) if args.to_day else datetime.now(UTC).date(),
+        )
+    with SessionLocal() as s:
+        occupied = s.query(GNodeSql).count()
+        if occupied and not args.wipe:
+            raise SystemExit(
+                f"registry holds {occupied} GNodes; rerun with --wipe to rebuild from capture"
+            )
+        if args.wipe:
+            # command_log must go too: idempotent replay short-circuits on a
+            # logged hash, which would skip re-applying against wiped state.
+            for table in (
+                ConnectivityEdgeSql,
+                AliasAssignmentSql,
+                GNodeSql,
+                PositionPointSql,
+                CommandLogSql,
+            ):
+                s.query(table).delete(synchronize_session=False)
+            s.commit()
+
+    report = rebuild(store)
+    with SessionLocal() as s:
+        violations = validate_registry(s, universe)
+
+    print(
+        f"applied {report.applied}, re-refused {report.refused}, "
+        f"checkpoints {report.checkpoints}"
+    )
+    if report.skipped_type_names:
+        print("skipped:", ", ".join(sorted(report.skipped_type_names)))
+    for m in report.mismatches:
+        print("MISMATCH:", m)
+    for v in violations:
+        print("VIOLATION:", v)
+    if report.mismatches or violations:
+        raise SystemExit(1)
+    print("rebuild ok")
 
 
 def _run_snapshot(roots: list[str]) -> None:
@@ -267,6 +339,32 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("rabbit", help="run the rabbit write loop")
     sub.add_parser("api", help="run the HTTP read façade")
+    rebuild = sub.add_parser(
+        "rebuild",
+        help="rebuild the registry from the ear's capture (the restore path): "
+        "the seed store bucket (--seedstore, GNR_SEEDSTORE__* settings) or a "
+        "directory of eventstore objects (--capture-dir)",
+    )
+    source = rebuild.add_mutually_exclusive_group(required=True)
+    source.add_argument(
+        "--seedstore",
+        action="store_true",
+        help="read the seed-store bucket; --from is required",
+    )
+    source.add_argument(
+        "--capture-dir", help="read eventstore objects under this directory"
+    )
+    rebuild.add_argument(
+        "--from", dest="from_day", help="first day to read, YYYYMMDD (--seedstore)"
+    )
+    rebuild.add_argument(
+        "--to", dest="to_day", help="last day to read, YYYYMMDD (default: today)"
+    )
+    rebuild.add_argument(
+        "--wipe",
+        action="store_true",
+        help="empty the registry first (required when it holds rows)",
+    )
     snapshot = sub.add_parser(
         "snapshot",
         help="broadcast a forest snapshot per root and exit (anti-entropy)",
@@ -305,5 +403,9 @@ def main() -> None:
         _run_api()
     elif args.command == "snapshot":
         _run_snapshot(args.roots)
+    elif args.command == "rebuild":
+        if args.seedstore and not args.from_day:
+            parser.error("--seedstore requires --from YYYYMMDD")
+        _run_rebuild(args)
     else:
         _run_create(args)
