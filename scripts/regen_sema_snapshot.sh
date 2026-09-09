@@ -24,7 +24,7 @@ SEMA_REPO="${SEMA_REPO:-$(cd "${REPO_ROOT}/../sema" 2>/dev/null && pwd || true)}
 
 # The three repo-specific facts (gjk's values shown as a worked example):
 PACKAGE_NAME="gnr"
-SEED="${REPO_ROOT}/gnr_seed_request.yaml"
+SEED="${REPO_ROOT}/src/gnr/sema_seed_request.yaml"
 VENDOR_DIR="${REPO_ROOT}/src/gnr/sema"
 
 if [[ "${PACKAGE_NAME}" == "CHANGEME" ]]; then
