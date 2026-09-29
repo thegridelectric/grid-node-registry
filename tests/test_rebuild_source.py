@@ -26,6 +26,15 @@ def test_parse_object_key_reads_the_ear_grammar():
     assert parsed.persisted_ms == 1787846141199
 
 
+def test_parse_object_key_reads_the_same_millisecond_counter():
+    plain = parse_object_key("x/hw1.gnr-g.node.forest-1787846141199-hw1.gnr.ear.json")
+    third = parse_object_key("x/hw1.gnr-g.node.forest-1787846141199-hw1.gnr.ear.3.json")
+    assert plain is not None and third is not None
+    assert plain.seq == 1
+    assert third.seq == 3
+    assert third.persisted_ms == plain.persisted_ms
+
+
 def test_parse_object_key_refuses_names_outside_the_grammar():
     assert parse_object_key("hw1__1/hw1.gnr.ear-hb-hw1.gnr.ear.json") is None
     assert parse_object_key("_unparsed_some.key-1787846141199-hw1.gnr.ear.txt") is None
@@ -61,6 +70,25 @@ def test_capture_objects_filters_and_orders_by_persisted_ms():
     ]
     assert report.skipped_type_names == {"g.node.cmd.ack"}
     assert report.unparsed_keys == 1
+
+
+def test_capture_objects_orders_a_same_millisecond_burst_by_arrival():
+    # Three creates persisted in one millisecond: parent first on the wire,
+    # so parent first on replay. Plain string order would put `.2`/`.3`
+    # before the plain name and replay children before their parent.
+    keys = [
+        "x/d1.mm-g.node.create.cmd-500-d1.tap.3.json",
+        "x/d1.mm-g.node.create.cmd-500-d1.tap.json",
+        "x/d1.mm-g.node.create.cmd-500-d1.tap.2.json",
+        "x/d1.mm-g.node.create.cmd-499-d1.tap.9.json",
+    ]
+    ordered = capture_objects(FakeStore(keys), RebuildReport())
+    assert [(o.persisted_ms, o.seq) for o in ordered] == [
+        (499, 9),
+        (500, 1),
+        (500, 2),
+        (500, 3),
+    ]
 
 
 def test_local_capture_dir_reads_flat_and_nested_layouts(tmp_path: Path):

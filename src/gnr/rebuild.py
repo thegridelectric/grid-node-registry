@@ -49,26 +49,36 @@ REPLAY_TYPE_NAMES = frozenset({CREATE_CMD, REPARENT_CMD, FOREST})
 
 class CaptureObject(NamedTuple):
     """One eventstore object as named by the ear: `key` is what the store
-    fetches by; `type_name` and `persisted_ms` are parsed from its name."""
+    fetches by; `type_name`, `persisted_ms` and `seq` are parsed from its
+    name. `seq` is the ear's arrival counter within one millisecond (1 for
+    the plain name, N for a `<source>.N` suffix)."""
 
     key: str
     type_name: str
     persisted_ms: int
+    seq: int
 
 
 def parse_object_key(key: str) -> CaptureObject | None:
     """Read the ear's name grammar off a key (any prefix, `.json` suffix):
     `<from-alias>-<type-name>-<persisted-ms>-<source>`. Aliases and type
-    names are dotted, never dashed, so the dash split is exact. Returns
-    None for a name outside the grammar (an ear's `_unparsed_` files, a
-    heartbeat `<alias>-hb-<alias>`) — a rebuild skips those, never guesses."""
+    names are dotted, never dashed, so the dash split is exact. A source
+    ending in a bare-digit segment (`hw1.ear.2`) carries the ear's arrival
+    counter for a burst inside one millisecond; an alias segment never is
+    all digits. Returns None for a name outside the grammar (an ear's
+    `_unparsed_` files, a heartbeat `<alias>-hb-<alias>`) — a rebuild skips
+    those, never guesses."""
     name = key.rsplit("/", 1)[-1]
     if not name.endswith(".json"):
         return None
     parts = name[: -len(".json")].split("-")
     if len(parts) != 4 or not parts[2].isdigit():
         return None
-    return CaptureObject(key=key, type_name=parts[1], persisted_ms=int(parts[2]))
+    source_tail = parts[3].rsplit(".", 1)[-1]
+    seq = int(source_tail) if source_tail.isdigit() else 1
+    return CaptureObject(
+        key=key, type_name=parts[1], persisted_ms=int(parts[2]), seq=seq
+    )
 
 
 class ObjectStore(Protocol):
@@ -140,7 +150,8 @@ class RebuildReport:
 
 def capture_objects(store: ObjectStore, report: RebuildReport) -> list[CaptureObject]:
     """The replayable objects in a store, in capture order (`persisted_ms`,
-    then key for a stable tie-break). Other type names are counted on the
+    then the ear's same-millisecond arrival counter, then key for a stable
+    tie-break). Other type names are counted on the
     report as skipped; keys outside the grammar are counted as unparsed."""
     selected: list[CaptureObject] = []
     for key in store.list_keys():
@@ -151,7 +162,7 @@ def capture_objects(store: ObjectStore, report: RebuildReport) -> list[CaptureOb
             selected.append(parsed)
         else:
             report.skipped_type_names.add(parsed.type_name)
-    return sorted(selected, key=lambda o: (o.persisted_ms, o.key))
+    return sorted(selected, key=lambda o: (o.persisted_ms, o.seq, o.key))
 
 
 def checkpoint_state(forest: dict) -> dict:

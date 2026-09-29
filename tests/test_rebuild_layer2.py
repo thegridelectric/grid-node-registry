@@ -43,6 +43,8 @@ class CaptureTap(ActorBase):
     def __init__(self, *, settings: ServiceSettings, root) -> None:
         super().__init__(settings=settings)
         self._root = root
+        self.last_persisted_ms = 0
+        self.same_ms_count = 0
 
     def local_rabbit_startup(self) -> None:
         # The tap's slice is everything: the fabric feeds the bus into
@@ -50,10 +52,16 @@ class CaptureTap(ActorBase):
         self._single_channel.queue_bind(self.queue_name, EAR_EXCHANGE, routing_key="#")
 
     def dispatch_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
-        name = (
-            f"{envelope.from_alias}-{envelope.type_name}"
-            f"-{int(time.time() * 1000)}-{self.alias}.json"
-        )
+        # The ear's same-millisecond rule: a burst keeps distinct names and
+        # its arrival order (`<source>.2`, `<source>.3`, ...).
+        ms = int(time.time() * 1000)
+        if ms == self.last_persisted_ms:
+            self.same_ms_count += 1
+            source = f"{self.alias}.{self.same_ms_count}"
+        else:
+            self.last_persisted_ms, self.same_ms_count = ms, 1
+            source = self.alias
+        name = f"{envelope.from_alias}-{envelope.type_name}-{ms}-{source}.json"
         (self._root / name).write_bytes(body)
 
 
