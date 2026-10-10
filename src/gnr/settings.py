@@ -65,6 +65,9 @@ class RabbitRunSettings(ServiceSettings):
 
     super_alias: str
     time_coordinator_alias: str
+    # Seconds between forest-snapshot broadcasts (anti-entropy), run inside
+    # the rabbit process.
+    snapshot_interval_s: int
     # XDG path segment: the actor logs to ~/.local/state/gridworks/gnr/log/
     # (gwbase paths convention; inherited default would say "gridworks").
     service_name: str = "gnr"

@@ -129,6 +129,11 @@ class AuthoritySource(ABC):
         comparing the queried alias to the returned `alias` (a mismatch ⇒ stale)."""
 
     @abstractmethod
+    def forest_roots(self) -> list[LeftRightDot]:
+        """Every forest root this registry holds, sorted (the aliases whose
+        parent is the bare universe token)."""
+
+    @abstractmethod
     def get_forest(self, roots: list[LeftRightDot]) -> GNodeForest:
         """The forest under `roots`: the subtree (root + active descendants) of each
         root alias, as `g.node.gt`s + any active non-tree edges among them
@@ -221,6 +226,14 @@ class PostgresAuthority(AuthoritySource):
                 GNodeSql, claim.g_node_id
             )  # the permanent owner, current form
             return owner.to_gt() if owner is not None else None
+
+    def forest_roots(self) -> list[LeftRightDot]:
+        with self._session_factory() as s:
+            return sorted(
+                row.alias
+                for row in s.query(GNodeSql).all()
+                if is_forest_root(row.alias)
+            )
 
     def get_forest(self, roots: list[LeftRightDot]) -> GNodeForest:
         with self._session_factory() as s:

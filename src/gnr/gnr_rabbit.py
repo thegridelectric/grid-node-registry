@@ -8,11 +8,17 @@ enum, since transport routing is decoupled from message decoding.
 
 The write loop: consume a `g.node.create.cmd` or `g.node.reparent.cmd`, apply
 it, and broadcast the resulting `g.node.forest` (the affected subtree).
+
+The snapshot loop: a thread inside the same process broadcasts the forest
+under every root once per `snapshot_interval_s` (anti-entropy). One process
+holds the registry's cert: the FIS gate leases a cert's identity to one
+running instance, so a second process presenting it would supersede this one.
 """
 
 from __future__ import annotations
 
 import json
+import threading
 
 from gwbase import Orchestrator, ServiceSettings
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
@@ -32,6 +38,9 @@ from gnr.settings import Settings
 
 CREATE_CMD = "g.node.create.cmd"
 REPARENT_CMD = "g.node.reparent.cmd"
+# The first snapshot waits this long after start, so a restart (or a crash
+# loop) does not re-broadcast the forest at once.
+SNAPSHOT_STARTUP_DELAY_S = 300
 
 
 class GnrRabbit(Orchestrator):
@@ -41,6 +50,8 @@ class GnrRabbit(Orchestrator):
         self,
         *,
         settings: ServiceSettings,
+        snapshot_interval_s: float,
+        snapshot_startup_delay_s: float,
         authority: AuthoritySource | None = None,
         my_super_alias: LeftRightDot = "d1.super1",
         my_time_coordinator_alias: LeftRightDot = "d1.time",
@@ -55,6 +66,26 @@ class GnrRabbit(Orchestrator):
             universe=Settings().universe,
             write_proof_sha256=Settings().write_proof_sha256,
         )
+        # One lock around read-then-broadcast on both paths, so a snapshot
+        # read before a write commits is never published after that write's
+        # change broadcast (publishes are queued onto the ioloop in order).
+        self.forest_lock = threading.Lock()
+        self.snapshot_interval_s = snapshot_interval_s
+        self.snapshot_startup_delay_s = snapshot_startup_delay_s
+        self.snapshot_stop = threading.Event()
+        self.snapshot_thread = threading.Thread(
+            target=self.run_snapshots, name=f"{self.alias}-snapshots", daemon=True
+        )
+
+    def local_start(self) -> None:
+        super().local_start()
+        self.snapshot_thread.start()
+
+    def local_stop(self) -> None:
+        super().local_stop()
+        self.snapshot_stop.set()
+        if self.snapshot_thread.is_alive():
+            self.snapshot_thread.join()
 
     def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
         if envelope.type_name not in (CREATE_CMD, REPARENT_CMD):
@@ -64,6 +95,10 @@ class GnrRabbit(Orchestrator):
         # command log records for an applied command.
         chash = command_hash(body)
         cmd = default_codec.from_dict(json.loads(body))
+        with self.forest_lock:
+            self.apply_and_broadcast(envelope, cmd, chash)
+
+    def apply_and_broadcast(self, envelope: RoutingEnvelope, cmd, chash: str) -> None:
         try:
             if envelope.type_name == CREATE_CMD:
                 broadcast = self.authority.apply_create(cmd)
@@ -108,14 +143,35 @@ class GnrRabbit(Orchestrator):
             body=verdict.to_bytes(),
         )
 
+    def run_snapshots(self) -> None:
+        """The snapshot loop: one `broadcast_all_snapshots` per interval, the
+        first after the startup delay. A tick while not consuming is skipped;
+        a tick that raises is logged and the loop keeps going."""
+        if self.snapshot_stop.wait(self.snapshot_startup_delay_s):
+            return
+        while True:
+            if self.consuming:
+                try:
+                    self.broadcast_all_snapshots()
+                except Exception:  # the snapshot loop keeps running
+                    self.logger.exception("snapshot broadcast failed")
+            if self.snapshot_stop.wait(self.snapshot_interval_s):
+                return
+
+    def broadcast_all_snapshots(self) -> None:
+        """One snapshot per forest root, under the forest lock."""
+        for root in self.authority.forest_roots():
+            with self.forest_lock:
+                self.broadcast_snapshot(root)
+            self.logger.info("snapshot broadcast: %s", root)
+
     def broadcast_snapshot(self, root: LeftRightDot) -> None:
         """Broadcast the current forest under `root` on `radio_channel = root`.
 
         The snapshot case of the channel rule: nothing changed, so the audience-
         known alias IS the current alias. Listeners treat it identically to a
         change broadcast (upsert the subtree) — it is the anti-entropy /
-        bootstrap-refresh path. Cadence is the deployment's concern (a periodic
-        driver calls this per top-level root); the mechanism lives here.
+        bootstrap-refresh path.
         """
         self.broadcast_topology(self.authority.get_forest([root]), radio_channel=root)
 

@@ -25,6 +25,7 @@ from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 from pydantic import SecretStr
 
 from gnr.db.authority import PostgresAuthority
+from gnr.db.validate import is_forest_root
 from gnr.dev_universe import DEV_POSITION_ID, seed_dev_universe
 from gnr.gnr_rabbit import GnrRabbit
 from gnr.sema.codec import default_codec
@@ -32,6 +33,9 @@ from gnr.sema.enums import BaseGNodeClass, GNodeStatus
 from gnr.sema.types import GNodeForest, GNodeGt, GNodeReparentCmd
 
 pytestmark = pytest.mark.integration
+
+# Scheduled snapshots stay out of tests that drive the actor by hand.
+NO_SNAPSHOTS_S = 10**6
 
 REGISTRY_ALIAS = "d1.gnr"
 KEENE = "d1.isone.me.versant.keene"  # a MarketMaker — authority over the beech subtree
@@ -67,7 +71,13 @@ class MarketMakerStub(Orchestrator):
     radio channel (keene is the stable parent under which the re-parent happens,
     so it is the audience-known channel the registry broadcasts on)."""
 
-    def __init__(self, *, settings: ServiceSettings, registry_alias: str) -> None:
+    def __init__(
+        self,
+        *,
+        settings: ServiceSettings,
+        registry_alias: str,
+        radio_channel: str = KEENE,
+    ) -> None:
         super().__init__(
             settings=settings,
             transport_class=TransportClass.MarketMaker,
@@ -75,6 +85,7 @@ class MarketMakerStub(Orchestrator):
             my_time_coordinator_alias="d1.time",
         )
         self._registry_alias = registry_alias
+        self._radio_channel = radio_channel
         self.broadcasts: list[bytes] = []
         self.broadcast_channels: list[str | None] = []
 
@@ -85,7 +96,7 @@ class MarketMakerStub(Orchestrator):
             from_alias=self._registry_alias,
             from_class=TransportClass.GridNodeRegistry,
             type_name=TOPOLOGY_BROADCAST,
-            radio_channel=KEENE,
+            radio_channel=self._radio_channel,
         )
 
     def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
@@ -118,6 +129,8 @@ def test_reparent_over_real_broker(session_factory, rabbit_url):
 
     registry = GnrRabbit(
         settings=ServiceSettings(service_alias=REGISTRY_ALIAS, rabbit=rabbit),
+        snapshot_interval_s=NO_SNAPSHOTS_S,
+        snapshot_startup_delay_s=NO_SNAPSHOTS_S,
         authority=PostgresAuthority(session_factory=session_factory, universe="d1"),
     )
     mm = MarketMakerStub(
@@ -193,3 +206,43 @@ def test_reparent_over_real_broker(session_factory, rabbit_url):
     assert moved is not None and moved.g_node_id == beech_ltn.g_node_id
     assert auth.get_by_alias(f"{KEENE}.sub.beech.scada") is not None
     assert auth.get_by_alias(f"{KEENE}.sub.beech.ta") is not None
+
+
+def test_scheduled_snapshot_over_real_broker(session_factory, rabbit_url):
+    """The in-process snapshot loop: with no command sent, a `g.node.forest`
+    for each forest root arrives on the root's channel once per interval."""
+    with session_factory() as s:
+        gnodes = seed_dev_universe(s)
+    roots = sorted(g.alias for g in gnodes if is_forest_root(g.alias))
+    assert roots, "the dev universe seeds at least one forest root"
+    root = roots[0]
+
+    provision_topology(rabbit_url)
+    rabbit = RabbitBrokerClient(url=SecretStr(rabbit_url))
+
+    registry = GnrRabbit(
+        settings=ServiceSettings(service_alias=REGISTRY_ALIAS, rabbit=rabbit),
+        snapshot_interval_s=1,
+        snapshot_startup_delay_s=0,
+        authority=PostgresAuthority(session_factory=session_factory, universe="d1"),
+    )
+    listener = MarketMakerStub(
+        settings=ServiceSettings(service_alias=KEENE, rabbit=rabbit),
+        registry_alias=REGISTRY_ALIAS,
+        radio_channel=root,
+    )
+    listener.start()
+    registry.start()
+    try:
+        _wait_for(lambda: listener._consuming, 15, "listener is consuming")
+        _wait_for(lambda: registry._consuming, 15, "registry is consuming")
+        _wait_for(lambda: len(listener.broadcasts) >= 2, 15, "two scheduled snapshots")
+    finally:
+        registry.stop()
+        listener.stop()
+
+    assert listener.broadcast_channels[0] == root
+    decoded = default_codec.from_dict(json.loads(listener.broadcasts[0]))
+    assert isinstance(decoded, GNodeForest)
+    assert root in {g.alias for g in decoded.nodes}
+    assert BEECH_LTN in {g.alias for g in decoded.nodes}
