@@ -1,9 +1,8 @@
 """Service entry points — the `gnr` console script.
 
-`gnr rabbit` runs the write loop (commands in, forest broadcasts out);
-`gnr api` runs the HTTP read façade; `gnr snapshot` broadcasts each forest
-root once and exits — the anti-entropy path, driven by a systemd timer on
-the box (`service/gnr-snapshot.timer`; the cadence lives in the timer file).
+`gnr rabbit` runs the write loop (commands in, forest broadcasts out) and
+the periodic forest-snapshot broadcast (`GNR_SNAPSHOT_INTERVAL_S`);
+`gnr api` runs the HTTP read façade.
 
 `gnr create` is the operator surface for entering ONE GNode: checks the
 alias isn't taken (via the read API), builds the node **Pending** with a
@@ -32,10 +31,8 @@ import uvicorn
 from gwbase import Orchestrator, ServiceSettings
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 
-from gnr.db.models import GNodeSql
-from gnr.db.session import SessionLocal
-from gnr.db.validate import is_forest_root, universe_of
-from gnr.gnr_rabbit import GnrRabbit
+from gnr.db.validate import universe_of
+from gnr.gnr_rabbit import SNAPSHOT_STARTUP_DELAY_S, GnrRabbit
 from gnr.ids import command_hash
 from gnr.sema.enums import BaseGNodeClass, GNodeStatus
 from gnr.sema.types import GNodeCreateCmd, GNodeGt
@@ -46,6 +43,8 @@ def _run_rabbit() -> None:
     run = RabbitRunSettings()
     actor = GnrRabbit(
         settings=run,
+        snapshot_interval_s=run.snapshot_interval_s,
+        snapshot_startup_delay_s=SNAPSHOT_STARTUP_DELAY_S,
         my_super_alias=run.super_alias,
         my_time_coordinator_alias=run.time_coordinator_alias,
     )
@@ -128,32 +127,6 @@ def _run_rebuild(args: argparse.Namespace) -> None:
     if report.mismatches or violations:
         raise SystemExit(1)
     print("rebuild ok")
-
-
-def _run_snapshot(roots: list[str]) -> None:
-    if not roots:
-        with SessionLocal() as s:
-            roots = sorted(
-                row.alias
-                for row in s.query(GNodeSql).all()
-                if is_forest_root(row.alias)
-            )
-    run = RabbitRunSettings()
-    actor = GnrRabbit(
-        settings=run,
-        my_super_alias=run.super_alias,
-        my_time_coordinator_alias=run.time_coordinator_alias,
-    )
-    actor.start()
-    deadline = time.time() + 15
-    while not actor._consuming and time.time() < deadline:
-        time.sleep(0.1)
-    try:
-        for root in roots:
-            actor.broadcast_snapshot(root)
-            print(f"snapshot broadcast: {root}")
-    finally:
-        actor.stop()
 
 
 class _OperatorPublisher(Orchestrator):
@@ -365,15 +338,6 @@ def main() -> None:
         action="store_true",
         help="empty the registry first (required when it holds rows)",
     )
-    snapshot = sub.add_parser(
-        "snapshot",
-        help="broadcast a forest snapshot per root and exit (anti-entropy)",
-    )
-    snapshot.add_argument(
-        "roots",
-        nargs="*",
-        help="root aliases to snapshot (default: every forest root)",
-    )
     create = sub.add_parser(
         "create",
         help="operator: enter ONE GNode (Pending) over the broker; no "
@@ -401,8 +365,6 @@ def main() -> None:
         _run_rabbit()
     elif args.command == "api":
         _run_api()
-    elif args.command == "snapshot":
-        _run_snapshot(args.roots)
     elif args.command == "rebuild":
         if args.seedstore and not args.from_day:
             parser.error("--seedstore requires --from YYYYMMDD")

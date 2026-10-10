@@ -39,6 +39,9 @@ from gnr.sema.types import GNodeCreateCmd, GNodeGt
 
 pytestmark = pytest.mark.integration
 
+# Scheduled snapshots stay out of tests that drive the actor by hand.
+NO_SNAPSHOTS_S = 10**6
+
 REGISTRY_ALIAS = "d1.gnr"
 
 
@@ -112,6 +115,8 @@ def test_nack_with_reason_then_ack_on_same_connection(session_factory, rabbit_ur
 
     registry = GnrRabbit(
         settings=ServiceSettings(service_alias=REGISTRY_ALIAS, rabbit=rabbit),
+        snapshot_interval_s=NO_SNAPSHOTS_S,
+        snapshot_startup_delay_s=NO_SNAPSHOTS_S,
         authority=PostgresAuthority(session_factory=session_factory, universe="d1"),
     )
     mm = VerdictPublisher(

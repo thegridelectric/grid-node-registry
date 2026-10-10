@@ -31,6 +31,9 @@ from gnr.sema.types import GNodeCreateCmd, GNodeReparentCmd
 
 pytestmark = pytest.mark.integration
 
+# Scheduled snapshots stay out of tests that drive the actor by hand.
+NO_SNAPSHOTS_S = 10**6
+
 REGISTRY_ALIAS = "d1.registry"
 
 
@@ -114,6 +117,8 @@ def test_rebuild_from_real_broker_capture(session_factory, rabbit_url, tmp_path)
 
     registry = GnrRabbit(
         settings=ServiceSettings(service_alias=REGISTRY_ALIAS, rabbit=rabbit),
+        snapshot_interval_s=NO_SNAPSHOTS_S,
+        snapshot_startup_delay_s=NO_SNAPSHOTS_S,
         authority=PostgresAuthority(session_factory=session_factory, universe="d1"),
     )
     tap = CaptureTap(

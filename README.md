@@ -140,9 +140,8 @@ restart.
 
 | Process | What it is | Logs |
 |---|---|---|
-| `gnr-rabbit.service` | rabbit write loop (commands in, forest broadcasts out) | `~/.local/state/gridworks/gnr/log/<service-alias>.log` (rotating) + `journalctl -u gnr-rabbit` |
+| `gnr-rabbit.service` | rabbit write loop (commands in, forest broadcasts out) + the periodic forest-snapshot broadcast (`GNR_SNAPSHOT_INTERVAL_S`) | `~/.local/state/gridworks/gnr/log/<service-alias>.log` (rotating) + `journalctl -u gnr-rabbit` |
 | `gnr-api.service` | public read-only HTTP façade, loopback :8000 (a TLS proxy fronts it) | `journalctl -u gnr-api` |
-| `gnr-snapshot.timer` → `.service` | periodic one-shot `gnr snapshot` — re-broadcasts each forest root (anti-entropy); cadence lives in the timer file | `journalctl -u gnr-snapshot` |
 | `gnr-postgres` (docker) | Postgres 16 | `docker logs gnr-postgres` |
 
 ## New instance — bring-up and populate
@@ -154,9 +153,9 @@ store bucket), and the registry is rebuilt from it. Order:
 1. **Postgres** on the box's encrypted volume — `gnr-postgres`, Postgres 16,
    loopback only; the DB URL goes in `.env` (`GNR_DB_URL`).
 2. **Schema:** `uv run alembic upgrade head` from the checkout.
-3. **Services:** copy `service/*.service` + `*.timer` to
-   `/etc/systemd/system/`, `daemon-reload`, enable `gnr-rabbit`, `gnr-api`,
-   `gnr-snapshot.timer`; front `:8000` with the TLS proxy. `gnr-rabbit`
+3. **Services:** copy `service/*.service` to `/etc/systemd/system/`,
+   `daemon-reload`, enable `gnr-rabbit` and `gnr-api`; front `:8000` with
+   the TLS proxy. `gnr-rabbit`
    must be the only consumer on the registry's queue — stop the old
    instance before starting the new one.
 4. **Populate**, one of:
