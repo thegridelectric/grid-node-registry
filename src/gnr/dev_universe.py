@@ -21,6 +21,7 @@ from gnr.db.models import (
     GNodeSql,
     PositionPointSql,
 )
+from gnr.display_name import default_display_name
 from gnr.ids import deterministic_uuid4
 from gnr.sema.enums import BaseGNodeClass as B
 from gnr.sema.enums import GNodeStatus as S
@@ -105,7 +106,7 @@ def build_dev_universe() -> list[GNodeGt]:
                 position_point_id=(
                     dev_position_id_for(alias) if physical and not pending else None
                 ),
-                display_name=alias,
+                display_name=default_display_name(alias, g_node_class),
             )
         )
     return gnodes

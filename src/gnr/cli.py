@@ -31,7 +31,11 @@ import uvicorn
 from gwbase import Orchestrator, ServiceSettings
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 
+from gnr.db.models import GNodeSql
+from gnr.db.session import SessionLocal
 from gnr.db.validate import universe_of
+from gnr.dev_universe import DEV_UNIVERSE, seed_dev_universe
+from gnr.display_name import default_display_name
 from gnr.gnr_rabbit import SNAPSHOT_STARTUP_DELAY_S, GnrRabbit
 from gnr.ids import command_hash
 from gnr.sema.enums import BaseGNodeClass, GNodeStatus
@@ -202,8 +206,8 @@ def _create_wizard(args: argparse.Namespace) -> None:
     print(f"  BaseGNodeClass (inferred, g.node.gt axiom 1): {base.value}")
 
     args.alias = input("alias (left.right.dot, e.g. hw1.isone.me): ").strip()
-    tail = args.alias.rsplit(".", 1)[-1].title()
-    args.display_name = input(f"display name [{tail}]: ").strip() or tail
+    default = default_display_name(args.alias, args.g_node_class)
+    args.display_name = input(f"display name [{default}]: ").strip() or default
     args.g_node_id = input("GNodeId [ENTER to mint fresh]: ").strip() or None
 
 
@@ -233,7 +237,8 @@ def _run_create(args: argparse.Namespace) -> None:
         # Pending-first (g.node.create.cmd/001 axiom 1): creation never
         # carries a location; the identity is registered after creation.
         position_point_id=None,
-        display_name=args.display_name or args.alias.rsplit(".", 1)[-1].title(),
+        display_name=args.display_name
+        or default_display_name(args.alias, args.g_node_class or base_class.value),
     )
     print(json.dumps(node.to_dict(), indent=2))
     if input("ENTER to publish this create (anything else aborts) ... ").strip():
@@ -305,6 +310,27 @@ def _run_create(args: argparse.Namespace) -> None:
         pub.stop()
 
 
+def _run_seed_dev(args: argparse.Namespace) -> None:
+    """Load the `d1` dev universe into the configured database. Refuses a
+    database holding any node outside `d1.`; wipes the registry tables only
+    on `--wipe`, and otherwise requires them empty."""
+    with SessionLocal() as s:
+        aliases = [row.alias for row in s.query(GNodeSql.alias).all()]
+        foreign = [a for a in aliases if not a.startswith(f"{DEV_UNIVERSE}.")]
+        if foreign:
+            sys.exit(
+                f"✗ refusing: the database holds {len(foreign)} node(s) outside "
+                f"{DEV_UNIVERSE}., e.g. {foreign[0]}"
+            )
+        if aliases and not args.wipe:
+            sys.exit(
+                f"✗ the registry holds {len(aliases)} {DEV_UNIVERSE} node(s); "
+                "pass --wipe to replace them"
+            )
+        gnodes = seed_dev_universe(s, reset=args.wipe)
+    print(f"✓ seeded {len(gnodes)} {DEV_UNIVERSE} GNodes")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="gnr", description="Grid Node Registry service"
@@ -338,6 +364,15 @@ def main() -> None:
         action="store_true",
         help="empty the registry first (required when it holds rows)",
     )
+    seed_dev = sub.add_parser(
+        "seed-dev",
+        help="load the d1 dev universe into an empty registry (dev only)",
+    )
+    seed_dev.add_argument(
+        "--wipe",
+        action="store_true",
+        help="replace the d1 nodes already there (a non-d1 node is refused)",
+    )
     create = sub.add_parser(
         "create",
         help="operator: enter ONE GNode (Pending) over the broker; no "
@@ -365,6 +400,8 @@ def main() -> None:
         _run_rabbit()
     elif args.command == "api":
         _run_api()
+    elif args.command == "seed-dev":
+        _run_seed_dev(args)
     elif args.command == "rebuild":
         if args.seedstore and not args.from_day:
             parser.error("--seedstore requires --from YYYYMMDD")
