@@ -105,19 +105,23 @@ then `docker volume rm gnr_pgdata`) — Postgres only runs its init on an empty
 data dir.
 
 To load the dev universe (the `d1` mirror of a small fleet, six Active homes
-plus one Pending):
+plus one Pending) into an empty registry:
 
 ```
-uv run python -c "
-from gnr.db.session import SessionLocal
-from gnr.dev_universe import seed_dev_universe
-with SessionLocal() as s: seed_dev_universe(s)"
+uv run gnr seed-dev          # --wipe replaces the d1 nodes already there
 ```
+
+It refuses a database holding any node outside `d1.`. Every seeded node
+gets the default display name (`gnr.display_name`): a house's
+TerminalAsset is the house ("Beech"), its scada and LTN append the class
+("Beech Scada", "Beech LTN"), anything else is its last alias segment.
+The same default fills `gnr create` when no name is given.
 
 ## The public read API
 
-`uv run gnr api` serves the read façade (loopback :8000 by default; a TLS
-proxy fronts it in deploy). Interactive docs at `/docs` — every request and
+`uv run gnr api` serves the read façade (loopback :8000 by default, the port
+the deployed TLS proxy fronts; `template.env` binds 8010 so a dev laptop keeps
+8000 for scada live tests). Interactive docs at `/docs` — every request and
 response body is a **sema word** (a versioned, immutable, registry-published
 schema), and each schema in the docs links to its canonical definition.
 
