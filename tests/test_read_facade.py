@@ -86,6 +86,14 @@ def test_g_node_by_alias_current(client):
     assert client.get("/gnr/g-node-by-alias/d1.nope.nope").status_code == 404
 
 
+def test_the_dev_flo_is_served(client):
+    # The FLO service's GNode, a Logical forest root the dev LTNs send
+    # their flo.params to.
+    r = client.get("/gnr/g-node-by-alias/d1.flo")
+    assert r.status_code == 200
+    assert r.json()["GNodeClass"] == "Flo" and r.json()["BaseClass"] == "Logical"
+
+
 def test_g_node_by_alias_resolves_stale(client, session_factory):
     # current beech LTN
     beech = client.get(f"/gnr/g-node-by-alias/{BEECH_LTN}").json()

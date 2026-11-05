@@ -40,7 +40,7 @@ PENDING_HOME = f"{KEENE}.willow"
 def _dev_universe_specs() -> dict[LeftRightDot, tuple[B, str]]:
     """The dev universe as a flat `alias -> (base_class, g_node_class)` map.
 
-    `d1.isone` and `d1.time` are **forest roots** (their alias-parent is the bare
+    `d1.isone`, `d1.time` and `d1.flo` are **forest roots** (their alias-parent is the bare
     universe token `d1`, which is not a GNode). Copper (`MarketMaker`/
     `ConnectivityNode`) g_node_class equals the base_class value (axiom 1); the
     Logical services carry their role name.
@@ -53,6 +53,7 @@ def _dev_universe_specs() -> dict[LeftRightDot, tuple[B, str]]:
         KEENE: (B.MarketMaker, "MarketMaker"),
         # logical simulation services (used soon by simulated dev universes)
         "d1.time": (B.Logical, "TimeCoordinator"),  # a Logical forest root
+        "d1.flo": (B.Logical, "Flo"),  # the FLO service, a Logical forest root
         "d1.isone.me.weather": (B.Logical, "WeatherForecastService"),
         "d1.isone.me.price": (B.Logical, "PriceForecastService"),
     }
