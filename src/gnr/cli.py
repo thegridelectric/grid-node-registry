@@ -175,6 +175,7 @@ _KNOWN_LOGICAL = [
     "TimeCoordinator",
     "WeatherForecastService",
     "PriceForecastService",
+    "Flo",
 ]
 
 

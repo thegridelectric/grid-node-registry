@@ -215,7 +215,8 @@ def test_scheduled_snapshot_over_real_broker(session_factory, rabbit_url):
         gnodes = seed_dev_universe(s)
     roots = sorted(g.alias for g in gnodes if is_forest_root(g.alias))
     assert roots, "the dev universe seeds at least one forest root"
-    root = roots[0]
+    # The copper root beech hangs under; the Logical roots have their own forests.
+    root = next(r for r in roots if BEECH_LTN.startswith(r + "."))
 
     provision_topology(rabbit_url)
     rabbit = RabbitBrokerClient(url=SecretStr(rabbit_url))

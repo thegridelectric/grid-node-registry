@@ -96,6 +96,7 @@ def test_leaf_or_ta_cannot_be_a_forest_root():
     for ok in (
         node("d1.mm", B.MarketMaker),
         node("d1.time", B.Logical, "TimeCoordinator"),
+        node("d1.flo", B.Logical, "Flo"),
     ):
         assert check_class_hierarchy(tree(ok)) == []
 
