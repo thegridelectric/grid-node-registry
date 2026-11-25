@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "af9b8096-a849-4530-85b2-ed78ee20f9db",
+  "Alias": "d1.isone.ct.newhaven",
+  "BaseClass": "MarketMaker",
+  "GNodeClass": "MarketMaker",
+  "Status": "Active",
+  "PositionPointId": "856e9f72-33f6-4b2a-b847-77661fcb9e87",
+  "DisplayName": "Newhaven"
+}

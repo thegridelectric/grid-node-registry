@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "887a5ee9-16b0-4139-aeaa-00902ed4a02f",
+  "Alias": "d1.isone",
+  "BaseClass": "MarketMaker",
+  "GNodeClass": "MarketMaker",
+  "Status": "Active",
+  "PositionPointId": "a376cb92-f92d-43e3-ad3e-404071117a70",
+  "DisplayName": "Isone"
+}

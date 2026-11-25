@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "ae7d7d71-1d24-4384-8a45-cca5d7801022",
+  "Alias": "d1.isone.me.versant.keene.spruce",
+  "BaseClass": "LeafTransactiveNode",
+  "GNodeClass": "LeafTransactiveNode",
+  "Status": "Active",
+  "PositionPointId": "a30a165f-c3ba-448a-9ed8-99386b93e4fd",
+  "DisplayName": "Spruce LTN"
+}

@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "a9695147-e91f-4c63-946f-f9a9a5777f6b",
+  "Alias": "d1.isone.me.versant.keene.maple.ta",
+  "BaseClass": "TerminalAsset",
+  "GNodeClass": "TerminalAsset",
+  "Status": "Active",
+  "PositionPointId": "9f3459cb-ac55-4bda-9e19-40cb299715b5",
+  "DisplayName": "Maple"
+}

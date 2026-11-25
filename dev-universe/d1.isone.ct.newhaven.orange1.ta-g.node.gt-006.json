@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "475f6786-8c63-4176-bd8f-aa1eede2f740",
+  "Alias": "d1.isone.ct.newhaven.orange1.ta",
+  "BaseClass": "TerminalAsset",
+  "GNodeClass": "TerminalAsset",
+  "Status": "Active",
+  "PositionPointId": "694b14c5-6063-4c2c-9264-27add9f9528e",
+  "DisplayName": "Orange1"
+}

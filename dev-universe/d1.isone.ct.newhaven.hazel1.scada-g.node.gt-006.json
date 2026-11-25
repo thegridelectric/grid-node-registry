@@ -1,0 +1,10 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "7c385a41-8dfd-420d-bbf2-bdd2f0556a2c",
+  "Alias": "d1.isone.ct.newhaven.hazel1.scada",
+  "BaseClass": "Logical",
+  "GNodeClass": "Scada",
+  "Status": "Active",
+  "DisplayName": "Hazel1 Scada"
+}

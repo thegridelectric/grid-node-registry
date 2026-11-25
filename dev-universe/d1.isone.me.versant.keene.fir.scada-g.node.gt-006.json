@@ -1,0 +1,10 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "d7f92719-6734-46f6-ab70-69c14daf829c",
+  "Alias": "d1.isone.me.versant.keene.fir.scada",
+  "BaseClass": "Logical",
+  "GNodeClass": "Scada",
+  "Status": "Active",
+  "DisplayName": "Fir Scada"
+}

@@ -1,0 +1,10 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "0472b76d-5670-46f3-80a2-ae138e9c6c6a",
+  "Alias": "d1.time",
+  "BaseClass": "Logical",
+  "GNodeClass": "TimeCoordinator",
+  "Status": "Active",
+  "DisplayName": "Time"
+}

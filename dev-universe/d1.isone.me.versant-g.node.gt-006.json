@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "cc5f0211-fa2c-497e-8b98-442357da45f5",
+  "Alias": "d1.isone.me.versant",
+  "BaseClass": "ConnectivityNode",
+  "GNodeClass": "ConnectivityNode",
+  "Status": "Active",
+  "PositionPointId": "d358621c-9840-4a18-9e72-24016bbdbc71",
+  "DisplayName": "Versant"
+}

@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "18d199e5-ca65-4593-bebf-988f7ba8f215",
+  "Alias": "d1.isone.me.versant.keene.fir",
+  "BaseClass": "LeafTransactiveNode",
+  "GNodeClass": "LeafTransactiveNode",
+  "Status": "Active",
+  "PositionPointId": "3010479e-eea9-4e2e-a4d3-0bf77c1162c3",
+  "DisplayName": "Fir LTN"
+}

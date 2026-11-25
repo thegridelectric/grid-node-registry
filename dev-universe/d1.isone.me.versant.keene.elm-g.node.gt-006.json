@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "a4d22536-d5b5-42bc-8aa7-8a9545ba475e",
+  "Alias": "d1.isone.me.versant.keene.elm",
+  "BaseClass": "LeafTransactiveNode",
+  "GNodeClass": "LeafTransactiveNode",
+  "Status": "Active",
+  "PositionPointId": "462d19b5-77ff-467b-8ebc-cc2097d120c8",
+  "DisplayName": "Elm LTN"
+}

@@ -1,0 +1,10 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "93d1937a-937e-422e-90e9-d8f68705efa6",
+  "Alias": "d1.isone.me.versant.keene.willow.scada",
+  "BaseClass": "Logical",
+  "GNodeClass": "Scada",
+  "Status": "Pending",
+  "DisplayName": "Willow Scada"
+}

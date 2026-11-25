@@ -1,0 +1,10 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "e6f0a3b0-9856-4e9f-9460-31132165ee6a",
+  "Alias": "d1.isone.ct.newhaven.willow1.scada",
+  "BaseClass": "Logical",
+  "GNodeClass": "Scada",
+  "Status": "Active",
+  "DisplayName": "Willow1 Scada"
+}

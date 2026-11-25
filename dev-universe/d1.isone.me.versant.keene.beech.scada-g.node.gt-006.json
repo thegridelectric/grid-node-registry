@@ -1,0 +1,10 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "182b2b32-3341-435b-bf77-83fa4f4680aa",
+  "Alias": "d1.isone.me.versant.keene.beech.scada",
+  "BaseClass": "Logical",
+  "GNodeClass": "Scada",
+  "Status": "Active",
+  "DisplayName": "Beech Scada"
+}

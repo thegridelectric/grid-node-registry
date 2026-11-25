@@ -106,12 +106,20 @@ container's credentials, remove the named volume first (`docker compose down`
 then `docker volume rm gnr_pgdata`) — Postgres only runs its init on an empty
 data dir.
 
-To load the dev universe (the `d1` mirror of a small fleet, six Active homes
-plus one Pending) into an empty registry:
+To load the dev universe (the `d1` mirror of a small fleet: two local
+markets, their Active homes plus one Pending, and the simulation services)
+into an empty registry:
 
 ```
 uv run gnr seed-dev          # --wipe replaces the d1 nodes already there
 ```
+
+The seed is the one source of d1 GNode identity. `dev-universe/` is its
+export, one `g.node.gt` file per GNode named
+`<alias>-g.node.gt-<version>.json`, and a test keeps the folder equal to a
+fresh `uv run gnr export-dev dev-universe`. A repo that needs a d1 alias,
+GNodeId or PositionPointId copies its file from here and records the
+registry commit beside the copy.
 
 It refuses a database holding any node outside `d1.`. Every seeded node
 gets the default display name (`gnr.display_name`): a house's

@@ -1,0 +1,10 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "8f97924a-624f-4db0-a2f3-f65671253dcd",
+  "Alias": "d1.isone.me.versant.keene.spruce.scada",
+  "BaseClass": "Logical",
+  "GNodeClass": "Scada",
+  "Status": "Active",
+  "DisplayName": "Spruce Scada"
+}

@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "1ad3d7fe-5364-44d3-9941-b05c8ad37996",
+  "Alias": "d1.isone.me",
+  "BaseClass": "ConnectivityNode",
+  "GNodeClass": "ConnectivityNode",
+  "Status": "Active",
+  "PositionPointId": "92a99f2d-e279-4065-a635-71e462535775",
+  "DisplayName": "Me"
+}

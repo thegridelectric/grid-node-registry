@@ -1,0 +1,10 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "795c3e82-b537-4fed-a7cd-94bb8bdca401",
+  "Alias": "d1.isone.me.versant.keene.oak.scada",
+  "BaseClass": "Logical",
+  "GNodeClass": "Scada",
+  "Status": "Active",
+  "DisplayName": "Oak Scada"
+}

@@ -1,0 +1,10 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "b386ae66-976a-4b21-89a8-2b353c5c1053",
+  "Alias": "d1.isone.ct.newhaven.orange1.scada",
+  "BaseClass": "Logical",
+  "GNodeClass": "Scada",
+  "Status": "Active",
+  "DisplayName": "Orange1 Scada"
+}

@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "26ecf777-5bcf-4e93-a82a-e190d3085a9f",
+  "Alias": "d1.isone.me.versant.keene.larch.ta",
+  "BaseClass": "TerminalAsset",
+  "GNodeClass": "TerminalAsset",
+  "Status": "Active",
+  "PositionPointId": "75da66b6-121b-4d55-b078-bd35e1d87ebe",
+  "DisplayName": "Larch"
+}
