@@ -19,6 +19,7 @@ import uuid
 import pytest
 from gwbase import Orchestrator, ServiceSettings
 from gwbase.config.rabbit_settings import RabbitBrokerClient
+from gwbase.sema.types import GridworksHeader
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 from pydantic import SecretStr
 from test_layer2_rabbit import provision_topology
@@ -92,7 +93,13 @@ class VerdictPublisher(Orchestrator):
         self._registry_alias = registry_alias
         self.verdicts: dict[str, dict] = {}
 
-    def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
+    def process_message(
+        self,
+        *,
+        envelope: RoutingEnvelope,
+        body: bytes,
+        header: GridworksHeader | None,
+    ) -> None:
         if envelope.type_name in ("g.node.cmd.ack", "g.node.cmd.nack"):
             v = json.loads(body)
             self.verdicts[v["CommandHash"]] = v

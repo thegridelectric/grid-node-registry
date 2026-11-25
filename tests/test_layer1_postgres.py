@@ -32,7 +32,7 @@ from gnr.sema.types import GNodeCreateCmd, GNodeGt, GNodeReparentCmd
 pytestmark = pytest.mark.integration
 
 KEENE = "d1.isone.me.versant.keene"
-BEECH_LTN = f"{KEENE}.beech"
+BEECH_LTN = f"{KEENE}.beech1"
 ELM_LTN = f"{KEENE}.elm"
 
 
@@ -107,17 +107,17 @@ def test_reparent_rewrites_subtree(seeded, session_factory):
     # The broadcast carries the new node + the rewritten beech subtree.
     broadcast_aliases = {g.alias for g in broadcast.nodes}
     assert f"{KEENE}.sub" in broadcast_aliases
-    assert f"{KEENE}.sub.beech" in broadcast_aliases
-    assert f"{KEENE}.sub.beech.scada" in broadcast_aliases
-    assert f"{KEENE}.sub.beech.ta" in broadcast_aliases
+    assert f"{KEENE}.sub.beech1" in broadcast_aliases
+    assert f"{KEENE}.sub.beech1.scada" in broadcast_aliases
+    assert f"{KEENE}.sub.beech1.ta" in broadcast_aliases
 
     # The DB reflects the rewrite: ids are stable, aliases moved, old freed.
     assert auth.get_by_alias(BEECH_LTN) is None
-    moved = auth.get_by_alias(f"{KEENE}.sub.beech")
+    moved = auth.get_by_alias(f"{KEENE}.sub.beech1")
     assert moved is not None and moved.g_node_id == beech_ltn.g_node_id
     assert moved.prev_alias == BEECH_LTN
-    assert auth.get_by_alias(f"{KEENE}.sub.beech.scada") is not None
-    assert auth.get_by_alias(f"{KEENE}.sub.beech.ta") is not None
+    assert auth.get_by_alias(f"{KEENE}.sub.beech1.scada") is not None
+    assert auth.get_by_alias(f"{KEENE}.sub.beech1.ta") is not None
 
     # No edge rows anywhere: the re-parent is purely the alias rewrite (the
     # tree is the alias structure; edges are reserved for non-tree copper).
@@ -129,7 +129,7 @@ def test_reparent_rewrites_subtree(seeded, session_factory):
 
         # Alias-ledger: the moved node still owns its original alias forever, and
         # now also owns the new one (alias-uniqueness-through-time).
-        owner = s.get(AliasAssignmentSql, f"{KEENE}.sub.beech")
+        owner = s.get(AliasAssignmentSql, f"{KEENE}.sub.beech1")
         assert owner is not None and owner.g_node_id == beech_ltn.g_node_id
         old = s.get(AliasAssignmentSql, BEECH_LTN)
         assert old is not None and old.g_node_id == beech_ltn.g_node_id
@@ -138,13 +138,13 @@ def test_reparent_rewrites_subtree(seeded, session_factory):
 def test_reparent_self_collision_aborts(seeded, session_factory):
     """A generated alias the ledger already binds to another node aborts atomically.
 
-    Pre-create a node that permanently owns `keene.sub.beech`; a re-parent that
+    Pre-create a node that permanently owns `keene.sub.beech1`; a re-parent that
     would regenerate that alias for a *different* node must roll the whole thing
     back, leaving the registry untouched and still valid.
     """
     auth = _authority(session_factory)
     beech_ltn = seeded[BEECH_LTN]
-    colliding_alias = f"{KEENE}.sub.beech"
+    colliding_alias = f"{KEENE}.sub.beech1"
 
     # A long-retired node that once owned the alias the re-parent would generate.
     with session_factory() as s:

@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "0f603a10-1b3e-4d67-ac4e-6011abab9429",
+  "Alias": "d1.isone.me.versant.keene.beech2",
+  "BaseClass": "LeafTransactiveNode",
+  "GNodeClass": "LeafTransactiveNode",
+  "Status": "Active",
+  "PositionPointId": "6282c4a2-4679-4cc4-9e27-9e1ed4aa6d5a",
+  "DisplayName": "Beech2 LTN"
+}

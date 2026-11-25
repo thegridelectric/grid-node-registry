@@ -21,6 +21,7 @@ from gwbase import topology
 from gwbase.config import ServiceSettings
 from gwbase.config.rabbit_settings import RabbitBrokerClient
 from gwbase.orchestrator import Orchestrator
+from gwbase.sema.types import GridworksHeader
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 from pydantic import SecretStr
 
@@ -39,7 +40,7 @@ NO_SNAPSHOTS_S = 10**6
 
 REGISTRY_ALIAS = "d1.gnr"
 KEENE = "d1.isone.me.versant.keene"  # a MarketMaker — authority over the beech subtree
-BEECH_LTN = f"{KEENE}.beech"
+BEECH_LTN = f"{KEENE}.beech1"
 TOPOLOGY_BROADCAST = "g.node.forest"
 
 
@@ -99,7 +100,13 @@ class MarketMakerStub(Orchestrator):
             radio_channel=self._radio_channel,
         )
 
-    def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
+    def process_message(
+        self,
+        *,
+        envelope: RoutingEnvelope,
+        body: bytes,
+        header: GridworksHeader | None,
+    ) -> None:
         if envelope.type_name == TOPOLOGY_BROADCAST:
             self.broadcasts.append(body)
             self.broadcast_channels.append(getattr(envelope, "radio_channel", None))
@@ -185,9 +192,9 @@ def test_reparent_over_real_broker(session_factory, rabbit_url):
     assert isinstance(decoded, GNodeForest)
     broadcast_aliases = {g.alias for g in decoded.nodes}
     assert f"{KEENE}.sub" in broadcast_aliases
-    assert f"{KEENE}.sub.beech" in broadcast_aliases
-    assert f"{KEENE}.sub.beech.scada" in broadcast_aliases
-    assert f"{KEENE}.sub.beech.ta" in broadcast_aliases
+    assert f"{KEENE}.sub.beech1" in broadcast_aliases
+    assert f"{KEENE}.sub.beech1.scada" in broadcast_aliases
+    assert f"{KEENE}.sub.beech1.ta" in broadcast_aliases
 
     # The snapshot arrived on keene's current alias and carries the whole
     # subtree in its post-rename form.
@@ -197,15 +204,15 @@ def test_reparent_over_real_broker(session_factory, rabbit_url):
     assert snapshot.roots == [KEENE]
     snap_aliases = {g.alias for g in snapshot.nodes}
     assert KEENE in snap_aliases
-    assert f"{KEENE}.sub.beech" in snap_aliases  # the renamed home, current form
+    assert f"{KEENE}.sub.beech1" in snap_aliases  # the renamed home, current form
 
     # The DB reflects the rewrite: ids stable, aliases moved, old freed.
     auth = PostgresAuthority(session_factory=session_factory, universe="d1")
     assert auth.get_by_alias(BEECH_LTN) is None
-    moved = auth.get_by_alias(f"{KEENE}.sub.beech")
+    moved = auth.get_by_alias(f"{KEENE}.sub.beech1")
     assert moved is not None and moved.g_node_id == beech_ltn.g_node_id
-    assert auth.get_by_alias(f"{KEENE}.sub.beech.scada") is not None
-    assert auth.get_by_alias(f"{KEENE}.sub.beech.ta") is not None
+    assert auth.get_by_alias(f"{KEENE}.sub.beech1.scada") is not None
+    assert auth.get_by_alias(f"{KEENE}.sub.beech1.ta") is not None
 
 
 def test_scheduled_snapshot_over_real_broker(session_factory, rabbit_url):

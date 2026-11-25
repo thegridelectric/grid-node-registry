@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "38039e6f-3c4b-45f0-8072-027ab2200679",
+  "Alias": "d1.isone.me.versant.keene.beech1.ta",
+  "BaseClass": "TerminalAsset",
+  "GNodeClass": "TerminalAsset",
+  "Status": "Active",
+  "PositionPointId": "b2841f06-f0b2-4745-ab80-3841501d23f5",
+  "DisplayName": "Beech1"
+}

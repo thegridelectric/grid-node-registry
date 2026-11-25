@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "63b128e6-769a-4ba6-b351-fa2be1f6fdaf",
+  "Alias": "d1.isone.ct.newhaven.hazel1.ta",
+  "BaseClass": "TerminalAsset",
+  "GNodeClass": "TerminalAsset",
+  "Status": "Active",
+  "PositionPointId": "c1175ad1-d51a-4310-92a2-33d7f362b08a",
+  "DisplayName": "Hazel1"
+}

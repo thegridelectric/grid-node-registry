@@ -1,0 +1,10 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "a0368dce-ce3a-44c1-aee8-7c6efd3eda73",
+  "Alias": "d1.isone.me.versant.keene.maple.scada",
+  "BaseClass": "Logical",
+  "GNodeClass": "Scada",
+  "Status": "Active",
+  "DisplayName": "Maple Scada"
+}

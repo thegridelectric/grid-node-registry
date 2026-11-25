@@ -29,12 +29,13 @@ import boto3
 import certifi
 import uvicorn
 from gwbase import Orchestrator, ServiceSettings
+from gwbase.sema.types import GridworksHeader
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 
 from gnr.db.models import GNodeSql
 from gnr.db.session import SessionLocal
 from gnr.db.validate import universe_of
-from gnr.dev_universe import DEV_UNIVERSE, seed_dev_universe
+from gnr.dev_universe import DEV_UNIVERSE, export_dev_universe, seed_dev_universe
 from gnr.display_name import default_display_name
 from gnr.gnr_rabbit import SNAPSHOT_STARTUP_DELAY_S, GnrRabbit
 from gnr.ids import command_hash
@@ -148,7 +149,13 @@ class _OperatorPublisher(Orchestrator):
         )
         self.verdicts: dict[str, dict] = {}
 
-    def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
+    def process_message(
+        self,
+        *,
+        envelope: RoutingEnvelope,
+        body: bytes,
+        header: GridworksHeader | None,
+    ) -> None:
         if envelope.type_name in ("g.node.cmd.ack", "g.node.cmd.nack"):
             verdict = json.loads(body)
             self.verdicts[verdict["CommandHash"]] = verdict
@@ -332,6 +339,13 @@ def _run_seed_dev(args: argparse.Namespace) -> None:
     print(f"✓ seeded {len(gnodes)} {DEV_UNIVERSE} GNodes")
 
 
+def _run_export_dev(args: argparse.Namespace) -> None:
+    """Write the `d1` dev universe as one `g.node.gt` file per GNode. Needs no
+    database: the seed is a function of the aliases."""
+    written = export_dev_universe(Path(args.out_dir))
+    print(f"✓ wrote {len(written)} {DEV_UNIVERSE} GNodes to {args.out_dir}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="gnr", description="Grid Node Registry service"
@@ -374,6 +388,15 @@ def main() -> None:
         action="store_true",
         help="replace the d1 nodes already there (a non-d1 node is refused)",
     )
+    export_dev = sub.add_parser(
+        "export-dev",
+        help="write the d1 dev universe as one g.node.gt file per GNode, "
+        "for other repos to copy at a pinned commit",
+    )
+    export_dev.add_argument(
+        "out_dir",
+        help="the folder to write; the committed one is dev-universe/",
+    )
     create = sub.add_parser(
         "create",
         help="operator: enter ONE GNode (Pending) over the broker; no "
@@ -403,6 +426,8 @@ def main() -> None:
         _run_api()
     elif args.command == "seed-dev":
         _run_seed_dev(args)
+    elif args.command == "export-dev":
+        _run_export_dev(args)
     elif args.command == "rebuild":
         if args.seedstore and not args.from_day:
             parser.error("--seedstore requires --from YYYYMMDD")

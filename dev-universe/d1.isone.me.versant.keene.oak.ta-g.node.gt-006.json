@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "19ea638c-acdd-4f77-82dc-bb38033b6deb",
+  "Alias": "d1.isone.me.versant.keene.oak.ta",
+  "BaseClass": "TerminalAsset",
+  "GNodeClass": "TerminalAsset",
+  "Status": "Active",
+  "PositionPointId": "0555d252-603c-49a8-b634-7d1fd6083f5e",
+  "DisplayName": "Oak"
+}

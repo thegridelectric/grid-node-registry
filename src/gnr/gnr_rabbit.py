@@ -21,6 +21,7 @@ import json
 import threading
 
 from gwbase import Orchestrator, ServiceSettings
+from gwbase.sema.types import GridworksHeader
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 
 from gnr.db.authority import (
@@ -87,7 +88,13 @@ class GnrRabbit(Orchestrator):
         if self.snapshot_thread.is_alive():
             self.snapshot_thread.join()
 
-    def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
+    def process_message(
+        self,
+        *,
+        envelope: RoutingEnvelope,
+        body: bytes,
+        header: GridworksHeader | None,
+    ) -> None:
         if envelope.type_name not in (CREATE_CMD, REPARENT_CMD):
             return
         # Correlation is the hash of the bytes AS PUBLISHED — the same bytes

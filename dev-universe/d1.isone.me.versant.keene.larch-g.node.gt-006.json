@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "d6621892-47c5-4cef-be64-ee3d3a8c7748",
+  "Alias": "d1.isone.me.versant.keene.larch",
+  "BaseClass": "LeafTransactiveNode",
+  "GNodeClass": "LeafTransactiveNode",
+  "Status": "Active",
+  "PositionPointId": "e2b91abd-9ad2-464e-a0e6-8f03e19eea12",
+  "DisplayName": "Larch LTN"
+}

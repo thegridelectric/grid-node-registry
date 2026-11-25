@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "573604e9-5ac1-4610-95b9-308649f4c7cd",
+  "Alias": "d1.isone.me.versant.keene.elm.ta",
+  "BaseClass": "TerminalAsset",
+  "GNodeClass": "TerminalAsset",
+  "Status": "Active",
+  "PositionPointId": "974fe881-4474-40e3-b5a3-2e3cc98b4904",
+  "DisplayName": "Elm"
+}

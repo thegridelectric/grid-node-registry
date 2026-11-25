@@ -1,0 +1,10 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "840e046a-e215-49c9-b33c-5aa43f081363",
+  "Alias": "d1.isone.me.versant.keene.larch.scada",
+  "BaseClass": "Logical",
+  "GNodeClass": "Scada",
+  "Status": "Active",
+  "DisplayName": "Larch Scada"
+}

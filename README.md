@@ -26,9 +26,11 @@ rebuild-from-capture is the durability story, not database backups.
 Every GNode alias begins with a **universe** segment, and its first letter is
 the kind — a ladder where each step adds a requirement:
 
-- `d` = **dev** — runs locally on a single computer: all comms go through
-  localhost brokers (the isolation guarantee; the test harness and CI are dev
-  universes).
+- `d` = **delete** — all simulated, nothing kept, nothing trusted: every
+  participant is a simulation, no one keeps the data, and a reader cannot know
+  where it came from. It runs on a laptop or a shared box alike; a `d`
+  universe holds no real asset and its broker has no public DNS name (the
+  test harness and CI are `d` universes).
 - `h` = **hybrid** — the most flexible: distributed comms, real and simulated
   participants mixed, re-runnable (broker vhost `hw1__1`, `hw1__2`, … — one
   durable GNode set, many executions of time against it).
@@ -104,12 +106,20 @@ container's credentials, remove the named volume first (`docker compose down`
 then `docker volume rm gnr_pgdata`) — Postgres only runs its init on an empty
 data dir.
 
-To load the dev universe (the `d1` mirror of a small fleet, six Active homes
-plus one Pending) into an empty registry:
+To load the dev universe (the `d1` mirror of a small fleet: two local
+markets, their Active homes plus one Pending, and the simulation services)
+into an empty registry:
 
 ```
 uv run gnr seed-dev          # --wipe replaces the d1 nodes already there
 ```
+
+The seed is the one source of d1 GNode identity. `dev-universe/` is its
+export, one `g.node.gt` file per GNode named
+`<alias>-g.node.gt-<version>.json`, and a test keeps the folder equal to a
+fresh `uv run gnr export-dev dev-universe`. A repo that needs a d1 alias,
+GNodeId or PositionPointId copies its file from here and records the
+registry commit beside the copy.
 
 It refuses a database holding any node outside `d1.`. Every seeded node
 gets the default display name (`gnr.display_name`): a house's

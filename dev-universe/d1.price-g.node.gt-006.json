@@ -1,0 +1,10 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "15d1ba3a-8b2e-4691-8107-413374674a4d",
+  "Alias": "d1.price",
+  "BaseClass": "Logical",
+  "GNodeClass": "PriceForecastService",
+  "Status": "Active",
+  "DisplayName": "Price"
+}

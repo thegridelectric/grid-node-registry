@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "2187a035-def5-4a39-b46d-1f6f78126932",
+  "Alias": "d1.isone.ct",
+  "BaseClass": "ConnectivityNode",
+  "GNodeClass": "ConnectivityNode",
+  "Status": "Active",
+  "PositionPointId": "d69f6963-1367-4fe6-8e68-ae0b3bf4e446",
+  "DisplayName": "Ct"
+}

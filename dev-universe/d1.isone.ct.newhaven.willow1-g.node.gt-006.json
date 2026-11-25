@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "374047a5-d8d7-4b42-a64a-de1daa8babf8",
+  "Alias": "d1.isone.ct.newhaven.willow1",
+  "BaseClass": "LeafTransactiveNode",
+  "GNodeClass": "LeafTransactiveNode",
+  "Status": "Active",
+  "PositionPointId": "090cf1a2-10ab-4b92-8f6e-3c4a8049966e",
+  "DisplayName": "Willow1 LTN"
+}

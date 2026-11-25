@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "ceae332e-0543-4843-953b-a11a1c708fa2",
+  "Alias": "d1.isone.me.versant.keene.fir.ta",
+  "BaseClass": "TerminalAsset",
+  "GNodeClass": "TerminalAsset",
+  "Status": "Active",
+  "PositionPointId": "84c11a49-5450-425b-972d-3475cc7ddf7f",
+  "DisplayName": "Fir"
+}

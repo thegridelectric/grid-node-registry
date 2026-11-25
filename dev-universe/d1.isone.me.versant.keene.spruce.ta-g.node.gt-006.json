@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "9fa9ed01-7700-457f-8429-a4c508ec96a4",
+  "Alias": "d1.isone.me.versant.keene.spruce.ta",
+  "BaseClass": "TerminalAsset",
+  "GNodeClass": "TerminalAsset",
+  "Status": "Active",
+  "PositionPointId": "f623fccd-e0f9-48bf-a451-d990843cc84b",
+  "DisplayName": "Spruce"
+}

@@ -22,7 +22,7 @@ from gnr.sema.types import GNodeGt, GNodeReparentCmd
 pytestmark = pytest.mark.integration
 
 KEENE = "d1.isone.me.versant.keene"
-BEECH_LTN = f"{KEENE}.beech"
+BEECH_LTN = f"{KEENE}.beech1"
 _REQ_ID = "f47ac10b-58cc-4372-a567-0e02b2c3d479"
 
 
@@ -59,8 +59,8 @@ def test_forest_under_keene(client):
     aliases = {n["Alias"] for n in forest["Nodes"]}
     # the root + a home's LTN / TerminalAsset are all in the subtree
     assert KEENE in aliases
-    assert f"{KEENE}.beech" in aliases
-    assert f"{KEENE}.beech.ta" in aliases
+    assert f"{KEENE}.beech1" in aliases
+    assert f"{KEENE}.beech1.ta" in aliases
     # Edges carries only non-tree copper (ties/loops); the dev fleet is radial,
     # so it is empty — parent-child structure is derived from the aliases.
     assert forest["Edges"] == []
@@ -119,4 +119,4 @@ def test_g_node_by_alias_resolves_stale(client, session_factory):
     assert r.status_code == 200
     resolved = r.json()
     assert resolved["GNodeId"] == beech_id
-    assert resolved["Alias"] == f"{KEENE}.sub.beech"
+    assert resolved["Alias"] == f"{KEENE}.sub.beech1"

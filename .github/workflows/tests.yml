@@ -22,6 +22,8 @@ jobs:
         run: uv run ruff check --no-fix .
       - name: Ruff format check
         run: uv run ruff format --check .
+      - name: Sema snapshot staging check
+        run: uv run python -P src/gnr/sema/check_staging.py src/gnr/sema_seed_request.yaml --deploy-branch main
 
   tests:
     name: tests / 3.12

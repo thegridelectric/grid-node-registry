@@ -1,0 +1,10 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "87f059f6-aeb2-4e85-ab17-0fa49995a3ef",
+  "Alias": "d1.flo",
+  "BaseClass": "Logical",
+  "GNodeClass": "Flo",
+  "Status": "Active",
+  "DisplayName": "Flo"
+}

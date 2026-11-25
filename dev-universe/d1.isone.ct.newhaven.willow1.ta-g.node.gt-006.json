@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "5171dfd5-078e-4e91-88d4-e2820eebb45a",
+  "Alias": "d1.isone.ct.newhaven.willow1.ta",
+  "BaseClass": "TerminalAsset",
+  "GNodeClass": "TerminalAsset",
+  "Status": "Active",
+  "PositionPointId": "d2e9efe5-bf26-4278-8850-87078e31de92",
+  "DisplayName": "Willow1"
+}

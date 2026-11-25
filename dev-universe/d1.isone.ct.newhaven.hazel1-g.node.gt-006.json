@@ -1,0 +1,11 @@
+{
+  "TypeName": "g.node.gt",
+  "Version": "006",
+  "GNodeId": "79360e20-9e9c-4ff2-9697-c7f51018e0ff",
+  "Alias": "d1.isone.ct.newhaven.hazel1",
+  "BaseClass": "LeafTransactiveNode",
+  "GNodeClass": "LeafTransactiveNode",
+  "Status": "Active",
+  "PositionPointId": "ec75f4e9-140b-401f-b154-eb4fe6dcfa77",
+  "DisplayName": "Hazel1 LTN"
+}
