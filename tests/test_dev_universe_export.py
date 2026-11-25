@@ -51,7 +51,7 @@ def test_export_removes_a_stale_file(tmp_path: Path):
 
 def test_seed_has_the_simulated_fleet():
     by_alias = {g.alias: g for g in build_dev_universe()}
-    for home in (f"{KEENE}.beech", f"{KEENE}.beech2", f"{NEWHAVEN}.orange1"):
+    for home in (f"{KEENE}.beech1", f"{KEENE}.beech2", f"{NEWHAVEN}.orange1"):
         assert by_alias[f"{home}.ta"].g_node_class == "TerminalAsset"
         assert by_alias[f"{home}.scada"].g_node_class == "Scada"
     assert by_alias["d1.weather"].g_node_class == "WeatherForecastService"

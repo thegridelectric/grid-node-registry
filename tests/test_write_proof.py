@@ -95,7 +95,7 @@ def _active_cn(alias: str) -> GNodeGt:
 
 def test_reparent_without_proof_refused(gated, session_factory):
     with session_factory() as s:
-        beech_id = s.query(GNodeSql).filter_by(alias=f"{KEENE}.beech").one().id
+        beech_id = s.query(GNodeSql).filter_by(alias=f"{KEENE}.beech1").one().id
     with pytest.raises(ReparentError, match="Proof"):
         gated.apply_reparent(
             GNodeReparentCmd(
@@ -103,12 +103,12 @@ def test_reparent_without_proof_refused(gated, session_factory):
                 moved_child_g_node_ids=[beech_id],
             )
         )
-    assert gated.get_by_alias(f"{KEENE}.beech") is not None  # nothing moved
+    assert gated.get_by_alias(f"{KEENE}.beech1") is not None  # nothing moved
 
 
 def test_reparent_with_proof_lands(gated, session_factory):
     with session_factory() as s:
-        beech_id = s.query(GNodeSql).filter_by(alias=f"{KEENE}.beech").one().id
+        beech_id = s.query(GNodeSql).filter_by(alias=f"{KEENE}.beech1").one().id
     gated.apply_reparent(
         GNodeReparentCmd(
             new_node=_active_cn(f"{KEENE}.sub"),
@@ -116,5 +116,5 @@ def test_reparent_with_proof_lands(gated, session_factory):
             proof=SECRET,
         )
     )
-    moved = gated.get_by_alias(f"{KEENE}.sub.beech")
+    moved = gated.get_by_alias(f"{KEENE}.sub.beech1")
     assert moved is not None and moved.g_node_id == beech_id

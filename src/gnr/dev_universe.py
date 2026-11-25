@@ -41,12 +41,13 @@ from gnr.sema.types import GNodeGt
 DEV_UNIVERSE = "d1"
 KEENE = "d1.isone.me.versant.keene"
 NEWHAVEN = "d1.isone.ct.newhaven"
-# Each local market's homes. `beech2` is beech's twin: a second leaf built
-# from the same spec, so two variants run head to head in one market; the
+# Each local market's homes. `beech1` and `beech2` are twins: two leaves
+# built from one spec, so two variants run head to head in one market; the
 # alias says nothing about the variant, which is only in the operational
-# params. The newhaven homes carry the `1` the simulations give them.
+# params. A home that exists only as a simulation takes a number; a home
+# that stands in for one real house keeps its name.
 KEENE_HOMES = (
-    "beech",
+    "beech1",
     "beech2",
     "elm",
     "fir",
