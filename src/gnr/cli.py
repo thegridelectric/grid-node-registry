@@ -29,6 +29,7 @@ import boto3
 import certifi
 import uvicorn
 from gwbase import Orchestrator, ServiceSettings
+from gwbase.sema.types import GridworksHeader
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 
 from gnr.db.models import GNodeSql
@@ -148,7 +149,13 @@ class _OperatorPublisher(Orchestrator):
         )
         self.verdicts: dict[str, dict] = {}
 
-    def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
+    def process_message(
+        self,
+        *,
+        envelope: RoutingEnvelope,
+        body: bytes,
+        header: GridworksHeader | None,
+    ) -> None:
         if envelope.type_name in ("g.node.cmd.ack", "g.node.cmd.nack"):
             verdict = json.loads(body)
             self.verdicts[verdict["CommandHash"]] = verdict

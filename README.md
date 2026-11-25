@@ -26,9 +26,11 @@ rebuild-from-capture is the durability story, not database backups.
 Every GNode alias begins with a **universe** segment, and its first letter is
 the kind — a ladder where each step adds a requirement:
 
-- `d` = **dev** — runs locally on a single computer: all comms go through
-  localhost brokers (the isolation guarantee; the test harness and CI are dev
-  universes).
+- `d` = **delete** — all simulated, nothing kept, nothing trusted: every
+  participant is a simulation, no one keeps the data, and a reader cannot know
+  where it came from. It runs on a laptop or a shared box alike; a `d`
+  universe holds no real asset and its broker has no public DNS name (the
+  test harness and CI are `d` universes).
 - `h` = **hybrid** — the most flexible: distributed comms, real and simulated
   participants mixed, re-runnable (broker vhost `hw1__1`, `hw1__2`, … — one
   durable GNode set, many executions of time against it).

@@ -16,6 +16,7 @@ import time
 import pytest
 from gwbase import ActorBase, Orchestrator, ServiceSettings
 from gwbase.config.rabbit_settings import RabbitBrokerClient
+from gwbase.sema.types import GridworksHeader
 from gwbase.topology import EAR_EXCHANGE
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 from pydantic import SecretStr
@@ -81,7 +82,13 @@ class CommandPublisher(Orchestrator):
         )
         self._registry_alias = registry_alias
 
-    def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
+    def process_message(
+        self,
+        *,
+        envelope: RoutingEnvelope,
+        body: bytes,
+        header: GridworksHeader | None,
+    ) -> None:
         pass  # publisher only; the tap does the witnessing
 
     def publish(self, cmd) -> None:

@@ -21,6 +21,7 @@ from gwbase import topology
 from gwbase.config import ServiceSettings
 from gwbase.config.rabbit_settings import RabbitBrokerClient
 from gwbase.orchestrator import Orchestrator
+from gwbase.sema.types import GridworksHeader
 from gwbase.transport_encoding import RoutingEnvelope, TransportClass
 from pydantic import SecretStr
 
@@ -99,7 +100,13 @@ class MarketMakerStub(Orchestrator):
             radio_channel=self._radio_channel,
         )
 
-    def process_message(self, *, envelope: RoutingEnvelope, body: bytes) -> None:
+    def process_message(
+        self,
+        *,
+        envelope: RoutingEnvelope,
+        body: bytes,
+        header: GridworksHeader | None,
+    ) -> None:
         if envelope.type_name == TOPOLOGY_BROADCAST:
             self.broadcasts.append(body)
             self.broadcast_channels.append(getattr(envelope, "radio_channel", None))

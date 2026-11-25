@@ -11,6 +11,9 @@ step "uv sync (locked)" uv sync --all-groups --locked
 # lint
 step "ruff check" uv run ruff check --no-fix .
 step "ruff format --check" uv run ruff format --check .
+step "sema snapshot staging check" uv run python -P \
+  src/gnr/sema/check_staging.py src/gnr/sema_seed_request.yaml \
+  --deploy-branch main
 
 # tests need docker (testcontainers: postgres + rabbit).
 if ! docker info >/dev/null 2>&1; then
