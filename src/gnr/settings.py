@@ -68,6 +68,10 @@ class RabbitRunSettings(ServiceSettings):
     # Seconds between forest-snapshot broadcasts (anti-entropy), run inside
     # the rabbit process.
     snapshot_interval_s: int
+    # Seconds from start to the first snapshot broadcast. A long delay keeps
+    # a restart (or a crash loop) from re-broadcasting the forest at once; a
+    # short one gives a stack that starts with the registry its forest early.
+    snapshot_startup_delay_s: int
     # XDG path segment: the actor logs to ~/.local/state/gridworks/gnr/log/
     # (gwbase paths convention; inherited default would say "gridworks").
     service_name: str = "gnr"

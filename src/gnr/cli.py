@@ -37,7 +37,7 @@ from gnr.db.session import SessionLocal
 from gnr.db.validate import universe_of
 from gnr.dev_universe import DEV_UNIVERSE, export_dev_universe, seed_dev_universe
 from gnr.display_name import default_display_name
-from gnr.gnr_rabbit import SNAPSHOT_STARTUP_DELAY_S, GnrRabbit
+from gnr.gnr_rabbit import GnrRabbit
 from gnr.ids import command_hash
 from gnr.sema.enums import BaseGNodeClass, GNodeStatus
 from gnr.sema.types import GNodeCreateCmd, GNodeGt
@@ -49,7 +49,7 @@ def _run_rabbit() -> None:
     actor = GnrRabbit(
         settings=run,
         snapshot_interval_s=run.snapshot_interval_s,
-        snapshot_startup_delay_s=SNAPSHOT_STARTUP_DELAY_S,
+        snapshot_startup_delay_s=run.snapshot_startup_delay_s,
         my_super_alias=run.super_alias,
         my_time_coordinator_alias=run.time_coordinator_alias,
     )

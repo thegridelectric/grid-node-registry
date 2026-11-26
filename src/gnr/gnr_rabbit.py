@@ -39,9 +39,6 @@ from gnr.settings import Settings
 
 CREATE_CMD = "g.node.create.cmd"
 REPARENT_CMD = "g.node.reparent.cmd"
-# The first snapshot waits this long after start, so a restart (or a crash
-# loop) does not re-broadcast the forest at once.
-SNAPSHOT_STARTUP_DELAY_S = 300
 
 
 class GnrRabbit(Orchestrator):
