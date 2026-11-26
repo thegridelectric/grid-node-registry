@@ -1,0 +1,10 @@
+# The build context is only what the Dockerfile copies. Everything else
+# stays out, the .env and operator.env files above all.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+!alembic.ini
+!alembic/
+**/__pycache__

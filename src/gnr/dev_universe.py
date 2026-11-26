@@ -58,6 +58,13 @@ KEENE_HOMES = (
     "willow",
 )
 NEWHAVEN_HOMES = ("hazel1", "orange1", "willow1")
+# The twins' TerminalAssets are named for the variant each one is for, since
+# a display name is the label a person reads: beech1 is the house that uses
+# all its tanks, beech2 the one that uses only its buffer.
+TWIN_DISPLAY_NAMES: dict[str, str] = {
+    f"{KEENE}.beech1.ta": "beech-at",
+    f"{KEENE}.beech2.ta": "beech-buf",
+}
 # willow is the dev universe's non-Active home: Pending and locationless —
 # the posture every physical GNode is born into (pending-first); location
 # registration and activation arrive with the TaValidator work.
@@ -138,7 +145,9 @@ def build_dev_universe() -> list[GNodeGt]:
                 position_point_id=(
                     dev_position_id_for(alias) if physical and not pending else None
                 ),
-                display_name=default_display_name(alias, g_node_class),
+                display_name=TWIN_DISPLAY_NAMES.get(
+                    alias, default_display_name(alias, g_node_class)
+                ),
             )
         )
     return gnodes

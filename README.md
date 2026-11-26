@@ -121,11 +121,13 @@ fresh `uv run gnr export-dev dev-universe`. A repo that needs a d1 alias,
 GNodeId or PositionPointId copies its file from here and records the
 registry commit beside the copy.
 
-It refuses a database holding any node outside `d1.`. Every seeded node
+It refuses a database holding any node outside `d1.`. A seeded node
 gets the default display name (`gnr.display_name`): a house's
-TerminalAsset is the house ("Beech"), its scada and LTN append the class
-("Beech Scada", "Beech LTN"), anything else is its last alias segment.
-The same default fills `gnr create` when no name is given.
+TerminalAsset is the house ("Fir"), its scada and LTN append the class
+("Fir Scada", "Fir LTN"), anything else is its last alias segment.
+The same default fills `gnr create` when no name is given. The twins'
+TerminalAssets are the exception: `beech1.ta` is "beech-at" and
+`beech2.ta` is "beech-buf", the variant each twin is for.
 
 ## The public read API
 
@@ -154,9 +156,29 @@ restart.
 
 | Process | What it is | Logs |
 |---|---|---|
-| `gnr-rabbit.service` | rabbit write loop (commands in, forest broadcasts out) + the periodic forest-snapshot broadcast (`GNR_SNAPSHOT_INTERVAL_S`) | `~/.local/state/gridworks/gnr/log/<service-alias>.log` (rotating) + `journalctl -u gnr-rabbit` |
+| `gnr-rabbit.service` | rabbit write loop (commands in, forest broadcasts out) + the periodic forest-snapshot broadcast (`GNR_SNAPSHOT_INTERVAL_S`, the first one `GNR_SNAPSHOT_STARTUP_DELAY_S` after start) | `~/.local/state/gridworks/gnr/log/<service-alias>.log` (rotating) + `journalctl -u gnr-rabbit` |
 | `gnr-api.service` | public read-only HTTP façade, loopback :8000 (a TLS proxy fronts it) | `journalctl -u gnr-api` |
 | `gnr-postgres` (docker) | Postgres 16 | `docker logs gnr-postgres` |
+
+## The image
+
+Each push to `main` that changes the code, the migrations or the
+Dockerfile builds one image for linux/amd64 and linux/arm64 and pushes
+it to `ghcr.io/thegridelectric/grid-node-registry`, tagged with the full
+commit SHA and `latest`. Pin the SHA tag.
+
+The image runs `gnr`, and its command picks the process (`rabbit` by
+default). It has no `.env`: every setting is a `GNR_` environment
+variable. A dev universe comes up from an empty Postgres in three runs
+of the same image:
+
+```
+docker run --env-file gnr.env --entrypoint alembic <image> upgrade head
+docker run --env-file gnr.env <image> seed-dev --wipe
+docker run --env-file gnr.env <image> rabbit
+```
+
+To build it locally: `docker build -t gnr .`
 
 ## New instance — bring-up and populate
 
